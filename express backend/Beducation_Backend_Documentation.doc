@@ -1,0 +1,103 @@
+Beducation Backend – Technical Documentation
+
+Overview
+--------
+Beducation is a Node.js backend using Express and MongoDB (Mongoose) for an educational platform. It supports user management, course management, enrollments, payments (with Stripe integration), and role-based access control.
+
+Main Technologies
+-----------------
+- Node.js & Express: RESTful API server.
+- MongoDB & Mongoose: Database and ODM.
+- Stripe: Online payment processing.
+- JWT: Authentication.
+- Multer & Cloudinary: File uploads and media management.
+
+Folder Structure
+----------------
+DB/
+  models/
+    User.model.js
+    Course.model.js
+    enrollment.model.js
+    payment.model.js
+src/
+  modules/
+    User/
+      user.controller.js
+      user.router.js
+    Course/
+      course.controller.js
+      course.router.js
+    enrollment/
+      enrollment.controller.js
+      enrollment.router.js
+    payment/
+      payment.controller.js
+      payment.router.js
+  middleware/
+    auth.js
+    validation.js
+  utils/
+    payment.js
+    cloudnairy.js
+    ...
+index.js
+package.json
+
+API Endpoints
+-------------
+User
+- POST /user/signUp – Register new user
+- POST /user/logIn – Login
+- POST /user/addUser – Add user (Admin)
+- GET /user/search – Search users
+- PUT /user/update – Update user (Auth)
+- DELETE /user/delete – Delete user (Auth)
+
+Course
+- POST /course/addCourse – Add course (Admin, with media upload)
+- GET /course/getCourses – List courses
+- GET /course/getCourse/:id – Get course by ID
+- PUT /course/updateCourse/:id – Update course (Admin)
+- DELETE /course/deleteCourse/:id – Delete course (Admin)
+
+Payment
+- POST /payment/stripe – Create Stripe payment session (Auth)
+- POST /payment/webhook – Stripe webhook for payment status (raw body, no auth)
+- GET /payment/my-payments – Get logged-in user's payments
+- GET /payment/my-enrollments – Get logged-in user's enrollments
+- POST /payment/secure-enroll – Enroll in course if payment completed (Auth)
+- POST /payment/createPay – Create payment (Admin)
+- GET /payment/getPayments – Get all payments (Admin)
+- GET /payment/getPayment/:id – Get payment by ID (Admin)
+- PUT /payment/updatePayment/:id – Update payment status (Admin, triggers enrollment)
+- DELETE /payment/deletePayment/:id – Delete payment (Admin)
+
+Enrollment
+- POST /enrollment/createEnrollment – Create enrollment (Admin)
+- GET /enrollment/getEnrollments – Get all enrollments (Admin)
+- GET /enrollment/getEnrollment/:id – Get enrollment by ID (Admin)
+- PUT /enrollment/updateEnrollment/:id – Update enrollment status (Admin)
+- DELETE /enrollment/deleteEnrollment/:id – Delete enrollment (Admin)
+
+Key Logic
+---------
+- Role-based Access: Most admin actions require role: "Admin".
+- Stripe Integration: Payments are processed via Stripe Checkout. Webhook updates payment status and triggers automatic enrollment.
+- Automatic Enrollment: When payment status is set to "completed", an enrollment is created for the user and course.
+- Security: Users can only enroll in courses they have paid for (via /secure-enroll).
+
+Stripe Webhook Setup
+--------------------
+- The /payment/webhook endpoint must use express.raw({ type: 'application/json' }) middleware in your main app file for Stripe signature verification.
+
+Error Handling
+--------------
+- Centralized error handling via asyncHandler and custom error classes.
+- Consistent status codes and messages for API responses.
+
+Recommendations
+---------------
+- Test all payment and enrollment flows end-to-end.
+- Secure webhook endpoint and validate Stripe signatures.
+- Expand user-facing endpoints as needed.
