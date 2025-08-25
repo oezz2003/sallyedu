@@ -27,7 +27,7 @@ const courseSchema=new Schema({
     },
     category:{
         type:String,
-        enum:["AI","programming","business","marketing","design","data science"],
+    
     },
     price:String,
 
@@ -37,11 +37,13 @@ const courseSchema=new Schema({
         type:Types.ObjectId,
         ref:"User"
     },
-   
-  media: {
-  public_id: { type: String },
-  secure_url: { type: String }
-},
+   media: {
+       type: Object,
+      /* properties: {
+           public_id: { type: String },
+           secure_url: { type: String }
+       }*/
+   },
 
 video: [videoSchema],
 createdBy:{

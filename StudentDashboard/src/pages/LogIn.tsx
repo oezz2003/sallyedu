@@ -7,6 +7,7 @@ import { useI18n } from "@/lib/i18n";
 import { Lock, Mail } from "lucide-react";
 import { Navigation } from "@/components/Navigation";
 
+
 export function LoginPage() {
   const { t, language } = useI18n();
   const [email, setEmail] = useState("");
@@ -14,28 +15,45 @@ export function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
 
-  function login(e: React.FormEvent) {
+  async function login(e: React.FormEvent) {
     e.preventDefault();
     setIsSubmitting(true);
-    
-    // Simulate loading
-    setTimeout(() => {
-      // Set default user data in localStorage
-      const defaultUser = {
-        uid: "default-user-123",
-        email: email || "student@example.com",
-        displayName: language === "ar" ? "أحمد محمد" : "Ahmed Mohammed",
-        firstName: language === "ar" ? "أحمد" : "Ahmed",
-        lastName: language === "ar" ? "محمد" : "Mohammed",
-        isDefaultUser: true
-      };
-      
-      localStorage.setItem("defaultUser", JSON.stringify(defaultUser));
-      localStorage.setItem("isLoggedIn", "true");
-      
+
+    try {
+      // استدعاء API الباك إند
+      const response = await fetch("https://ela-ee0o.onrender.com/user/logIn", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(data.message || "Login failed");
+        setIsSubmitting(false);
+        return;
+      }
+
+      // احفظ التوكن + بيانات اليوزر
+       localStorage.setItem("token", data.token.role);
+      localStorage.setItem("refreshToken", data.ref_token);
+        localStorage.setItem("role", data.role); 
+      localStorage.setItem("isAuthenticated", "true");
+      console.log("Role:", data.token.role, data.role);
+
+       if (data.token.role === "Admin" || data.role === "Admin") {
+        window.location.href = "http://localhost:8081/"; // Admin dashboard route
+      } else {
+  window.location.href = "http://localhost:8080/student-dashboard"; // Student dashboard route
+      }
+    } catch (error) {
+      console.error("Login error:", error);
+      alert("Something went wrong, please try again.");
       setIsSubmitting(false);
-      navigate("/student-dashboard", { replace: true });
-    }, 1000);
+    }
   }
 
   return (

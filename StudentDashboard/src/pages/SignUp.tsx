@@ -5,39 +5,20 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Navigation } from "@/components/Navigation";
 import { CountryCodeSelector } from "@/components/CountryCodeSelector";
-import { createUserWithEmailAndPassword } from "firebase/auth";
-import { auth, db } from "@/lib/firebase";
-import { doc, setDoc } from "firebase/firestore";
 
-interface UserProfile {
-  firstName: string;
-  lastName: string;
-  gaurdianFirstName: string;
-  gaurdianLastName: string;
-  email: string;
-  phone: string;
-  dateOfBirth: string;      // we store age here as a string
-  address: string;          // leave blank for now
-  country: string;          // could default to form value or ""
-  bio: string;              // leave blank
-  emailNotifications: boolean;
-  courseNotifications: boolean;
-  marketingEmails: boolean;
-}
 
 export function SignUpPage() {
   const [ageGroup, setAgeGroup] = useState<"over16" | "under16" | null>(null);
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // form state
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
-    age: "",                  // will map to dateOfBirth
-    country: "",              // for UserProfile.country
-    guardianFirstName: "",    // only for under16, we'll ignore if over16
-    guardianLastName: "",     // "
+    age: "",
+    country: "",
+    guardianFirstName: "",
+    guardianLastName: "",
     countryCode: "+20",
     phoneNumber: "",
     email: "",
@@ -58,45 +39,41 @@ export function SignUpPage() {
 
     setIsSubmitting(true);
     try {
-      // 1) create in Firebase Auth
-      const uc = await createUserWithEmailAndPassword(
-        auth,
-        formData.email,
-        formData.password
-      );
-      const uid = uc.user.uid;
+      const res = await fetch("https://ela-ee0o.onrender.com/user/signUp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          guardianFirstName: formData.guardianFirstName,
+          guardianLastName: formData.guardianLastName,
+          email: formData.email,
+          phone: `${formData.countryCode} ${formData.phoneNumber}`,
+          dateOfBirth: formData.age,
+          country: formData.country,
+          password: formData.password,
+        }),
+      });
 
-      // Initiating Profile Database Object
-      const profile: UserProfile = {
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        gaurdianFirstName: formData.guardianFirstName,
-        gaurdianLastName: formData.guardianLastName,
-        email: formData.email,
-        phone: `${formData.countryCode} ${formData.phoneNumber}`,
-        dateOfBirth: formData.age,
-        address: "",
-        country: formData.country,
-        bio: "",
-        emailNotifications: true,
-        courseNotifications: true,
-        marketingEmails: false,
-      };
-      await setDoc(doc(db, "users", uid), profile);
+      const data = await res.json();
 
+      if (!res.ok) {
+        window.alert(data.message || "Sign up failed");
+        return;
+      }
 
-      // Navigating to the dashboard
+      // خزني التوكين
+      localStorage.setItem("token", data.token);
+
+      // روح للداشبورد
       navigate("/student-dashboard", { replace: true });
     } catch (err: any) {
-      const msg =
-        err.code === "auth/email-already-in-use"
-          ? "This email is already in use."
-          : err.message;
-      window.alert("Sign up failed: " + msg);
+      window.alert("Sign up failed: " + err.message);
     } finally {
       setIsSubmitting(false);
     }
   };
+
 
   return (
     <div className="min-h-screen flex flex-col">

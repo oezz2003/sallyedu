@@ -13,14 +13,7 @@ export const signUp = asyncHandler(async (req, res, next) => {
 
  // const hashPassword = Hash({ plaintext: password });
 
-  const newUser= new userModel({
-    firstName,lastName,country,
-    password,
-    confirmPassword,
-    avatar,
-   //role:'User',
-    email // Ensure email is included
-  });
+  const newUser= new userModel(req.body)
   await newUser.save();
 
   return res.status(201).json({ message: 'User  created successfully', newUser });
