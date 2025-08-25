@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import StudentLayout from "@/components/studentLayout";
 import CourseDetailsModal from "@/components/CourseDetailsModal";
+import { useI18n } from "@/lib/i18n";
 import { 
   ShoppingCart, 
   Star, 
@@ -150,8 +151,8 @@ const mockCourses: Course[] = [
     duration: "42 hours",
     lessons: 156,
     level: "Intermediate",
-    category: "Frontend Development",
-    tags: ["Global Languages"],
+    category: "Languages",
+    tags: ["German", "Language", "Conversation"],
     features: ["Lifetime Access", "Mobile & Desktop", "Certificate", "30-day Money Back"],
     isPopular: true,
     isBestseller: true,
@@ -160,6 +161,7 @@ const mockCourses: Course[] = [
     language: "English",
     certificate: true,
   },
+  // ... existing code ...
   {
     id: "2", 
     title: "Python for Data Science and Machine Learning",
@@ -238,34 +240,26 @@ const mockCourses: Course[] = [
   },
 ];
 
-const categories = [
-  "All Courses",
-  "Languages",
-  "Development",
-  "Design",
-  "Healthcare",
-  "Business",
-  "Math",
-];
-
-const priceRanges = [
-  { label: "Free", min: 0, max: 0 },
-  { label: "Under $50", min: 0, max: 50 },
-  { label: "$50 - $100", min: 50, max: 100 },
-  { label: "$100 - $200", min: 100, max: 200 },
-  { label: "Over $200", min: 200, max: Infinity },
-];
-
 export default function Store() {
+  const { t, language } = useI18n();
   const [selectedCategory, setSelectedCategory] = useState("All Courses");
-  const [selectedPriceRange, setSelectedPriceRange] = useState<{min: number, max: number} | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("popularity");
   const [wishlist, setWishlist] = useState<Set<string>>(new Set());
-  const [cart, setCart] = useState<Set<string>>(new Set());
   const [currentRecommendedIndex, setCurrentRecommendedIndex] = useState(0);
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Dynamic categories based on language
+  const categories = [
+    t("store.allCourses"),
+    t("store.languages"),
+    t("store.development"),
+    t("store.design"),
+    t("store.healthcare"),
+    t("store.business"),
+    t("store.math"),
+  ];
 
   // Auto-rotate recommended courses every 3 seconds
   useEffect(() => {
@@ -276,15 +270,19 @@ export default function Store() {
   }, []);
 
   const filteredCourses = mockCourses.filter(course => {
-    const matchesCategory = selectedCategory === "All Courses" || course.category === selectedCategory;
-    const matchesPrice = !selectedPriceRange || 
-      (course.price >= selectedPriceRange.min && course.price <= selectedPriceRange.max);
+    const matchesCategory = selectedCategory === t("store.allCourses") || 
+      (selectedCategory === t("store.languages") && course.category === "Languages") ||
+      (selectedCategory === t("store.development") && course.category === "Development") ||
+      (selectedCategory === t("store.design") && course.category === "Design") ||
+      (selectedCategory === t("store.healthcare") && course.category === "Healthcare") ||
+      (selectedCategory === t("store.business") && course.category === "Business") ||
+      (selectedCategory === t("store.math") && course.category === "Math");
     const matchesSearch = !searchQuery || 
       course.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       course.instructor.toLowerCase().includes(searchQuery.toLowerCase()) ||
       course.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
     
-    return matchesCategory && matchesPrice && matchesSearch;
+    return matchesCategory && matchesSearch;
   });
 
   const toggleWishlist = (courseId: string) => {
@@ -299,18 +297,6 @@ export default function Store() {
     });
   };
 
-  const toggleCart = (courseId: string) => {
-    setCart(prev => {
-      const newCart = new Set(prev);
-      if (newCart.has(courseId)) {
-        newCart.delete(courseId);
-      } else {
-        newCart.add(courseId);
-      }
-      return newCart;
-    });
-  };
-
   const openCourseModal = (course: Course) => {
     setSelectedCourse(course);
     setIsModalOpen(true);
@@ -322,6 +308,10 @@ export default function Store() {
   };
 
   const getLevelColor = (level: string) => {
+    const translatedLevel = level === "Beginner" ? t("store.beginner") :
+                           level === "Intermediate" ? t("store.intermediate") :
+                           level === "Advanced" ? t("store.advanced") : level;
+    
     switch (level) {
       case "Beginner": return "bg-green-100 text-green-800";
       case "Intermediate": return "bg-yellow-100 text-yellow-800";
@@ -330,10 +320,14 @@ export default function Store() {
     }
   };
 
-  const totalCartValue = Array.from(cart).reduce((sum, courseId) => {
-    const course = mockCourses.find(c => c.id === courseId);
-    return sum + (course?.price || 0);
-  }, 0);
+  const getTranslatedLevel = (level: string) => {
+    switch (level) {
+      case "Beginner": return t("store.beginner");
+      case "Intermediate": return t("store.intermediate");
+      case "Advanced": return t("store.advanced");
+      default: return level;
+    }
+  };
 
   return (
     <StudentLayout>
@@ -341,26 +335,8 @@ export default function Store() {
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">Course Recommendations</h1>
-          <p className="text-slate-600">Discover and purchase premium courses to advance your skills</p>
-        </div>
-        
-        <div className="flex items-center space-x-4">
-          {cart.size > 0 && (
-            <div className="flex items-center space-x-2">
-              <div className="relative">
-                <ShoppingCart className="w-6 h-6 text-slate-600" />
-                <Badge className="absolute -top-2 -right-2 bg-primary text-white text-xs">
-                  {cart.size}
-                </Badge>
-              </div>
-              <div className="text-sm">
-                <p className="font-medium text-slate-900">${totalCartValue.toFixed(2)}</p>
-                <p className="text-slate-600">{cart.size} items</p>
-              </div>
-              <Button size="sm">Checkout</Button>
-            </div>
-          )}
+          <h1 className="text-3xl font-bold text-foreground">{t("store.title")}</h1>
+          <p className="text-muted-foreground">{t("store.subtitle")}</p>
         </div>
       </div>
 
@@ -379,13 +355,13 @@ export default function Store() {
                   />
                   <div className="flex-1">
                     <div className="flex items-center space-x-2 mb-1">
-                      <Badge className="bg-primary text-white text-xs">Recommended</Badge>
+                      <Badge className="bg-primary text-white text-xs">{t("store.recommended")}</Badge>
                       {course.discount && (
                         <Badge className="bg-red-500 text-white text-xs">-{course.discount}%</Badge>
                       )}
                     </div>
-                    <h3 className="font-semibold text-slate-900 text-lg mb-1">{course.title}</h3>
-                    <div className="flex items-center space-x-4 text-sm text-slate-600">
+                    <h3 className="font-semibold text-foreground text-lg mb-1">{course.title}</h3>
+                    <div className="flex items-center space-x-4 text-sm text-muted-foreground">
                       <div className="flex items-center space-x-1">
                         <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
                         <span>{course.rating}</span>
@@ -396,16 +372,16 @@ export default function Store() {
                   </div>
                   <div className="text-right">
                     <div className="flex items-center space-x-2 mb-2">
-                      <span className="text-2xl font-bold text-slate-900">${course.price}</span>
+                      <span className="text-2xl font-bold text-foreground">${course.price}</span>
                       {course.originalPrice && (
-                        <span className="text-sm text-slate-500 line-through">${course.originalPrice}</span>
+                        <span className="text-sm text-muted-foreground line-through">${course.originalPrice}</span>
                       )}
                     </div>
                     <Button
-                      onClick={() => toggleCart(course.id)}
+                      onClick={() => openCourseModal(course)}
                       className="min-w-[100px]"
                     >
-                      {cart.has(course.id) ? "Added" : "Add to Cart"}
+                      {t("store.viewDetails")}
                     </Button>
                   </div>
                 </div>
@@ -429,66 +405,66 @@ export default function Store() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
+        <Card className="bg-card border-border">
           <CardContent className="p-4 text-center">
             <BookOpen className="w-8 h-8 text-primary mx-auto mb-2" />
-            <p className="text-2xl font-bold text-slate-900">150+</p>
-            <p className="text-sm text-slate-600">Courses Available</p>
+            <p className="text-2xl font-bold text-foreground">150+</p>
+            <p className="text-sm text-muted-foreground">{t("store.coursesAvailable")}</p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-card border-border">
           <CardContent className="p-4 text-center">
             <Users className="w-8 h-8 text-success mx-auto mb-2" />
-            <p className="text-2xl font-bold text-slate-900">50k+</p>
-            <p className="text-sm text-slate-600">Happy Students</p>
+            <p className="text-2xl font-bold text-foreground">50k+</p>
+            <p className="text-sm text-muted-foreground">{t("store.happyStudents")}</p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-card border-border">
           <CardContent className="p-4 text-center">
             <Award className="w-8 h-8 text-warning mx-auto mb-2" />
-            <p className="text-2xl font-bold text-slate-900">98%</p>
-            <p className="text-sm text-slate-600">Completion Rate</p>
+            <p className="text-2xl font-bold text-foreground">98%</p>
+            <p className="text-sm text-muted-foreground">{t("store.completionRate")}</p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-card border-border">
           <CardContent className="p-4 text-center">
             <Star className="w-8 h-8 text-yellow-500 mx-auto mb-2" />
-            <p className="text-2xl font-bold text-slate-900">4.8</p>
-            <p className="text-sm text-slate-600">Average Rating</p>
+            <p className="text-2xl font-bold text-foreground">4.8</p>
+            <p className="text-sm text-muted-foreground">{t("store.averageRating")}</p>
           </CardContent>
         </Card>
       </div>
 
       <div>
-          <h1 className="text-3xl font-bold text-slate-900">Course Store</h1>
+          <h1 className="text-3xl font-bold text-foreground">{t("store.courseStore")}</h1>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Filters Sidebar */}
         <div className="space-y-6">
           {/* Search */}
-          <Card>
+          <Card className="bg-card border-border">
             <CardContent className="p-4">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <input
                   type="text"
-                  placeholder="Search courses..."
+                  placeholder={t("store.searchCourses")}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  className="w-full pl-10 pr-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-background text-foreground"
                 />
               </div>
             </CardContent>
           </Card>
 
           {/* Categories */}
-          <Card>
+          <Card className="bg-card border-border">
             <CardHeader>
-              <CardTitle className="text-lg">Categories</CardTitle>
+              <CardTitle className="text-lg text-foreground">{t("store.categories")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
               {categories.map((category) => (
@@ -504,50 +480,24 @@ export default function Store() {
             </CardContent>
           </Card>
 
-          {/* Price Range */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Price Range</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {priceRanges.map((range) => (
-                <Button
-                  key={range.label}
-                  variant={selectedPriceRange?.min === range.min ? "default" : "ghost"}
-                  onClick={() => setSelectedPriceRange(range)}
-                  className="w-full justify-start text-sm"
-                >
-                  {range.label}
-                </Button>
-              ))}
-              {selectedPriceRange && (
-                <Button
-                  variant="outline"
-                  onClick={() => setSelectedPriceRange(null)}
-                  className="w-full text-sm"
-                >
-                  Clear Filter
-                </Button>
-              )}
-            </CardContent>
-          </Card>
+
 
           {/* Sort Options */}
-          <Card>
+          <Card className="bg-card border-border">
             <CardHeader>
-              <CardTitle className="text-lg">Sort By</CardTitle>
+              <CardTitle className="text-lg text-foreground">{t("store.sortBy")}</CardTitle>
             </CardHeader>
             <CardContent>
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
-                className="w-full p-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                className="w-full p-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-background text-foreground"
               >
-                <option value="popularity">Popularity</option>
-                <option value="rating">Highest Rated</option>
-                <option value="price-low">Price: Low to High</option>
-                <option value="price-high">Price: High to Low</option>
-                <option value="newest">Newest First</option>
+                <option value="popularity">{t("store.popularity")}</option>
+                <option value="rating">{t("store.highestRated")}</option>
+                <option value="price-low">{t("store.priceLowToHigh")}</option>
+                <option value="price-high">{t("store.priceHighToLow")}</option>
+                <option value="newest">{t("store.newestFirst")}</option>
               </select>
             </CardContent>
           </Card>
@@ -556,11 +506,11 @@ export default function Store() {
         {/* Course Grid */}
         <div className="lg:col-span-3">
           <div className="flex items-center justify-between mb-6">
-            <p className="text-slate-600">{filteredCourses.length} courses found</p>
+            <p className="text-muted-foreground">{filteredCourses.length} {t("store.coursesFound")}</p>
             <div className="flex items-center space-x-2">
               <Button variant="outline" size="sm">
                 <Filter className="w-4 h-4 mr-2" />
-                Filters
+                {t("store.filters")}
               </Button>
             </div>
           </div>
@@ -579,17 +529,17 @@ export default function Store() {
                   <div className="absolute top-3 left-3 flex flex-col space-y-2">
                     {course.isBestseller && (
                       <Badge className="bg-orange-500 text-white text-xs">
-                        Bestseller
+                        {t("store.bestseller")}
                       </Badge>
                     )}
                     {course.isNew && (
                       <Badge className="bg-green-500 text-white text-xs">
-                        New
+                        {t("store.new")}
                       </Badge>
                     )}
                     {course.isPopular && (
                       <Badge className="bg-purple-500 text-white text-xs">
-                        Popular
+                        {t("store.popular")}
                       </Badge>
                     )}
                   </div>
@@ -623,23 +573,23 @@ export default function Store() {
                     <div>
                       <div className="flex items-start justify-between mb-2">
                         <Badge className={`text-xs ${getLevelColor(course.level)}`}>
-                          {course.level}
+                          {getTranslatedLevel(course.level)}
                         </Badge>
                         <div className="flex items-center space-x-1">
                           <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
                           <span className="text-xs font-medium">{course.rating}</span>
-                          <span className="text-xs text-slate-500">({course.reviews.toLocaleString()})</span>
+                          <span className="text-xs text-muted-foreground">({course.reviews.toLocaleString()})</span>
                         </div>
                       </div>
                       
                       <h3
-                        className="font-semibold text-slate-900 line-clamp-2 group-hover:text-primary transition-colors cursor-pointer"
+                        className="font-semibold text-foreground line-clamp-2 group-hover:text-primary transition-colors cursor-pointer"
                         onClick={() => openCourseModal(course)}
                       >
                         {course.title}
                       </h3>
                       
-                      <p className="text-sm text-slate-600 line-clamp-2 mt-2">
+                      <p className="text-sm text-muted-foreground line-clamp-2 mt-2">
                         {course.description}
                       </p>
                     </div>
@@ -651,22 +601,22 @@ export default function Store() {
                         alt={course.instructor}
                         className="w-6 h-6 rounded-full object-cover"
                       />
-                      <span className="text-sm text-slate-600">{course.instructor}</span>
+                      <span className="text-sm text-muted-foreground">{course.instructor}</span>
                     </div>
 
                     {/* Course Stats */}
-                    <div className="flex items-center space-x-4 text-xs text-slate-500">
+                    <div className="flex items-center space-x-4 text-xs text-muted-foreground">
                       <div className="flex items-center space-x-1">
                         <Clock className="w-3 h-3" />
                         <span>{course.duration}</span>
                       </div>
                       <div className="flex items-center space-x-1">
                         <Play className="w-3 h-3" />
-                        <span>{course.lessons} lessons</span>
+                        <span>{course.lessons} {t("store.lessons")}</span>
                       </div>
                       <div className="flex items-center space-x-1">
                         <Users className="w-3 h-3" />
-                        <span>{(course.students / 1000).toFixed(0)}k students</span>
+                        <span>{(course.students / 1000).toFixed(0)}k {t("store.students")}</span>
                       </div>
                     </div>
 
@@ -690,41 +640,31 @@ export default function Store() {
                     </div>
 
                     {/* Price & Actions */}
-                    <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+                    <div className="flex items-center justify-between pt-4 border-t border-border">
                       <div>
                         <div className="flex items-center space-x-2">
-                          <span className="text-2xl font-bold text-slate-900">
+                          <span className="text-2xl font-bold text-foreground">
                             ${course.price}
                           </span>
                           {course.originalPrice && (
-                            <span className="text-sm text-slate-500 line-through">
+                            <span className="text-sm text-muted-foreground line-through">
                               ${course.originalPrice}
                             </span>
                           )}
                         </div>
                         {course.originalPrice && (
                           <p className="text-xs text-green-600">
-                            Save ${(course.originalPrice - course.price).toFixed(2)}
+                            {t("store.save")} ${(course.originalPrice - course.price).toFixed(2)}
                           </p>
                         )}
                       </div>
                       
                       <Button
-                        onClick={() => toggleCart(course.id)}
-                        variant={cart.has(course.id) ? "outline" : "default"}
+                        onClick={() => openCourseModal(course)}
                         size="sm"
                       >
-                        {cart.has(course.id) ? (
-                          <>
-                            <CheckCircle className="w-4 h-4 mr-2" />
-                            Added
-                          </>
-                        ) : (
-                          <>
-                            <ShoppingCart className="w-4 h-4 mr-2" />
-                            Add to Cart
-                          </>
-                        )}
+                        <Play className="w-4 h-4 mr-2" />
+                        {t("store.viewDetails")}
                       </Button>
                     </div>
                   </div>
@@ -735,9 +675,9 @@ export default function Store() {
 
           {filteredCourses.length === 0 && (
             <div className="text-center py-12">
-              <BookOpen className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-slate-900 mb-2">No courses found</h3>
-              <p className="text-slate-600">Try adjusting your filters or search query.</p>
+              <BookOpen className="w-16 h-16 text-muted-foreground/50 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-foreground mb-2">{t("store.noCoursesFound")}</h3>
+              <p className="text-muted-foreground">{t("store.noCoursesDesc")}</p>
             </div>
           )}
         </div>
@@ -750,9 +690,7 @@ export default function Store() {
           course={selectedCourse}
           isOpen={isModalOpen}
           onClose={closeCourseModal}
-          onAddToCart={toggleCart}
           onToggleWishlist={toggleWishlist}
-          isInCart={cart.has(selectedCourse.id)}
           isInWishlist={wishlist.has(selectedCourse.id)}
         />
       )}

@@ -99,12 +99,12 @@ const GeolocationPopup = () => {
       {/* Processing */}
       {isProcessing && (
         <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-          <div className="bg-white p-8 rounded-xl shadow-xl w-full max-w-lg">
-            <div className="animate-spin w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4" />
-            <h3 className="text-xl font-semibold mb-2 text-center">
+          <div className="bg-card p-8 rounded-xl shadow-xl w-full max-w-lg border border-border">
+            <div className="animate-spin w-12 h-12 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4" />
+            <h3 className="text-xl font-semibold mb-2 text-center text-card-foreground">
               Detecting your location...
             </h3>
-            <p className="text-gray-600 text-center">
+            <p className="text-muted-foreground text-center">
               Please wait while we determine your country.
             </p>
           </div>
@@ -114,21 +114,21 @@ const GeolocationPopup = () => {
       {/* Location Request */}
       {showLocationRequest && !isProcessing && (
         <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-          <div className="bg-white p-8 rounded-xl shadow-xl w-full max-w-lg">
-            <h3 className="text-2xl font-bold mb-4 text-center">Enable Location?</h3>
-            <p className="text-gray-600 mb-6 text-center">
+          <div className="bg-card p-8 rounded-xl shadow-xl w-full max-w-lg border border-border">
+            <h3 className="text-2xl font-bold mb-4 text-center text-card-foreground">Enable Location?</h3>
+            <p className="text-muted-foreground mb-6 text-center">
               Allow access for local currency pricing.
             </p>
             <div className="flex justify-between gap-4">
               <button
                 onClick={handleDeny}
-                className="flex-1 px-6 py-3 bg-gray-200 rounded-lg hover:bg-gray-300"
+                className="flex-1 px-6 py-3 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/80 transition-colors"
               >
                 Deny
               </button>
               <button
                 onClick={requestLocation}
-                className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                className="flex-1 px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
               >
                 Allow
               </button>
@@ -140,30 +140,30 @@ const GeolocationPopup = () => {
       {/* Currency Reminder */}
       {showCurrencyReminder && !isProcessing && (
         <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-          <div className="bg-white p-8 rounded-xl shadow-xl w-full max-w-lg">
-            <h3 className="text-2xl font-bold mb-4 text-center">
+          <div className="bg-card p-8 rounded-xl shadow-xl w-full max-w-lg border border-border">
+            <h3 className="text-2xl font-bold mb-4 text-center text-card-foreground">
               {isEgyptUser ? "Local Pricing Enabled" : "Prices in USD"}
             </h3>
-            <p className="text-gray-600 mb-6 text-center">
+            <p className="text-muted-foreground mb-6 text-center">
               {isEgyptUser
                 ? "You’ll now see prices in EGP."
                 : "You’re viewing prices in USD."}
             </p>
             {geoError && (
-              <p className="text-yellow-600 mb-4 text-center">{geoError}</p>
+              <p className="text-warning mb-4 text-center">{geoError}</p>
             )}
             <div className="flex justify-center gap-4">
               {!isEgyptUser && (
                 <button
                   onClick={openLocationSettings}
-                  className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                  className="px-6 py-3 bg-success text-success-foreground rounded-lg hover:bg-success/90 transition-colors"
                 >
                   Allow Location
                 </button>
               )}
               <button
                 onClick={closeAllPopups}
-                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                className="px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
               >
                 OK
               </button>

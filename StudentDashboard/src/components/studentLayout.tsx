@@ -1,12 +1,13 @@
 import { ReactNode, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { BookOpen, Clock, Trophy, TrendingUp, Gift, Coins, ShoppingBag } from "lucide-react";
+import { BookOpen, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import ProfileDropdown from "./ProfileDropdown";
 import CustomerServiceModal from "./CustomerServiceModal";
 import { LanguageToggle } from "./LanguageToggle";
 import { ThemeToggle } from "./ThemeToggle";
+import { useI18n } from "@/lib/i18n";
 
 // useAuth hook from your lib (adjust path if different)
 import { useAuth } from "@/lib/useAuth";
@@ -20,6 +21,7 @@ export default function Layout({ children }: LayoutProps) {
   const navigate = useNavigate();
   const currentPath = location.pathname;
   const [isCustomerServiceOpen, setIsCustomerServiceOpen] = useState(false);
+  const { t, language, direction } = useI18n();
 
   // grab logout (and optionally user/loading) from your auth hook
   const { logout, user, loading } = useAuth() as {
@@ -27,9 +29,6 @@ export default function Layout({ children }: LayoutProps) {
     user?: any;
     loading?: boolean;
   };
-
-  // Mock user points - in a real app this would come from your state management/API
-  const userPoints = 2850;
 
   const handleLogout = async () => {
     try {
@@ -61,19 +60,19 @@ export default function Layout({ children }: LayoutProps) {
   const navItems = [
     {
       href: "/student-dashboard",
-      label: "لوحة التحكم",
+      label: t("nav.dashboard"),
       icon: BookOpen,
     },
     
     {
       href: "/Store",
-      label: "المتجر",
+      label: t("nav.store"),
       icon: ShoppingBag,
     },
   ];
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background" dir={direction}>
       {/* Header */}
       <header className="bg-card/80 backdrop-blur-sm border-b border-border sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -85,7 +84,7 @@ export default function Layout({ children }: LayoutProps) {
                 className="h-12 w-12 object-cover rounded-full"
               />
               <span className="hidden font-semibold text-lg sm:inline-block bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">
-                أكاديمية التعلم الذكي
+                {t("nav.academy")}
               </span>
 
               {/* Navigation */}
@@ -111,21 +110,6 @@ export default function Layout({ children }: LayoutProps) {
             </div>
 
             <div className="flex items-center space-x-4">
-              {/* Points Display */}
-              <div className="flex items-center space-x-2 bg-warning/10 border border-warning/20 rounded-full px-3 py-2">
-                <Coins className="w-4 h-4 text-warning" />
-                <span className="font-semibold text-warning-foreground">{userPoints.toLocaleString()}</span>
-                <span className="text-xs text-warning-foreground">نقطة</span>
-              </div>
-
-              {/* Hidden on mobile, shown on larger screens */}
-              <div className="hidden sm:flex items-center space-x-6 text-sm text-muted-foreground">
-                <div className="flex items-center space-x-2">
-                  <Trophy className="w-4 h-4 text-success" />
-                  <span>2 مكتملة</span>
-                </div>
-              </div>
-
               {/* Language and Theme Toggles */}
               <div className="flex items-center space-x-2">
                 <div className="transform hover-scale-105 transition-transform duration-300">

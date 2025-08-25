@@ -45,124 +45,243 @@ interface Course {
   lessons: Lesson[];
 }
 
-const mockCourse: Course = {
-  id: "1",
-  title: "Complete React Developer Course 2024",
-  instructor: "Jonas Schmedtmann",
-  instructorAvatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face",
-  totalLessons: 12,
-  completedLessons: 8,
-  totalDuration: "42 hours",
-  category: "Frontend Development",
-  lessons: [
-    {
-      id: "1",
-      title: "Introduction to React",
-      duration: "12:34",
-      isCompleted: true,
-      videoUrl: "https://youtu.be/GhTu53CRtJc?si=iDQN6rWAt0ElzP_X",
-      description: "Learn the fundamentals of React and why it's so popular",
-      resources: ["Slides.pdf", "Code Examples.zip"]
-    },
-    {
-      id: "2", 
-      title: "Setting Up Your Development Environment",
-      duration: "18:22",
-      isCompleted: true,
-      videoUrl: "https://youtu.be/GhTu53CRtJc?si=iDQN6rWAt0ElzP_X",
-      description: "Set up Node.js, VS Code, and create your first React app",
-      resources: ["Setup Guide.pdf"]
-    },
-    {
-      id: "3",
-      title: "Understanding JSX",
-      duration: "25:16",
-      isCompleted: true,
-      videoUrl: "https://youtu.be/GhTu53CRtJc?si=iDQN6rWAt0ElzP_X",
-      description: "Deep dive into JSX syntax and how it works",
-      resources: ["JSX Cheat Sheet.pdf"]
-    },
-    {
-      id: "4",
-      title: "Components and Props",
-      duration: "32:45",
-      isCompleted: true,
-      videoUrl: "https://youtu.be/GhTu53CRtJc?si=iDQN6rWAt0ElzP_X",
-      description: "Learn how to create and use React components with props"
-    },
-    {
-      id: "5",
-      title: "State and Event Handling",
-      duration: "28:33",
-      isCompleted: true,
-      videoUrl: "https://youtu.be/GhTu53CRtJc?si=iDQN6rWAt0ElzP_X",
-      description: "Master React state management and event handling"
-    },
-    {
-      id: "6",
-      title: "Working with Forms",
-      duration: "35:12",
-      isCompleted: true,
-      videoUrl: "https://youtu.be/GhTu53CRtJc?si=iDQN6rWAt0ElzP_X",
-      description: "Build interactive forms with controlled components"
-    },
-    {
-      id: "7",
-      title: "useEffect Hook",
-      duration: "29:48",
-      isCompleted: true,
-      videoUrl: "https://youtu.be/GhTu53CRtJc?si=iDQN6rWAt0ElzP_X",
-      description: "Learn the useEffect hook for side effects and lifecycle"
-    },
-    {
-      id: "8",
-      title: "React Router - Navigation",
-      duration: "24:56",
-      isCompleted: true,
-      videoUrl: "https://youtu.be/GhTu53CRtJc?si=iDQN6rWAt0ElzP_X",
-      description: "Implement client-side routing with React Router"
-    },
-    {
-      id: "9",
-      title: "Context API",
-      duration: "31:22",
-      isCompleted: false,
-      videoUrl: "https://youtu.be/GhTu53CRtJc?si=iDQN6rWAt0ElzP_X",
-      description: "Share state across components with Context API"
-    },
-    {
-      id: "10",
-      title: "Custom Hooks",
-      duration: "26:18",
-      isCompleted: false,
-      videoUrl: "https://youtu.be/GhTu53CRtJc?si=iDQN6rWAt0ElzP_X",
-      description: "Create reusable logic with custom React hooks"
-    },
-    {
-      id: "11",
-      title: "Performance Optimization",
-      duration: "38:42",
-      isCompleted: false,
-      videoUrl: "https://youtu.be/GhTu53CRtJc?si=iDQN6rWAt0ElzP_X",
-      description: "Optimize your React apps for better performance"
-    },
-    {
-      id: "12",
-      title: "Building and Deployment",
-      duration: "22:15",
-      isCompleted: false,
-      videoUrl: "https://youtu.be/GhTu53CRtJc?si=iDQN6rWAt0ElzP_X",
-      description: "Build and deploy your React application to production"
-    }
-  ]
+const mockCourses: { [key: string]: Course } = {
+  "1": {
+    id: "1",
+    title: "مقدمة في البرمجة",
+    instructor: "د. محمد أحمد",
+    instructorAvatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face",
+    totalLessons: 12,
+    completedLessons: 8,
+    totalDuration: "42 ساعة",
+    category: "برمجة",
+    lessons: [
+      {
+        id: "1",
+        title: "مقدمة في البرمجة",
+        duration: "12:34",
+        isCompleted: true,
+        videoUrl: "https://youtu.be/GhTu53CRtJc?si=iDQN6rWAt0ElzP_X",
+        description: "تعلم أساسيات البرمجة ولماذا هي مهمة",
+        resources: ["العروض التقديمية.pdf", "أمثلة الكود.zip"]
+      },
+      {
+        id: "2",
+        title: "إعداد بيئة التطوير",
+        duration: "18:22",
+        isCompleted: true,
+        videoUrl: "https://youtu.be/GhTu53CRtJc?si=iDQN6rWAt0ElzP_X",
+        description: "كيفية إعداد الأدوات اللازمة للبرمجة",
+        resources: ["دليل الإعداد.pdf"]
+      },
+      {
+        id: "3",
+        title: "المتغيرات وأنواع البيانات",
+        duration: "25:16",
+        isCompleted: true,
+        videoUrl: "https://youtu.be/GhTu53CRtJc?si=iDQN6rWAt0ElzP_X",
+        description: "فهم المتغيرات وأنواع البيانات المختلفة",
+        resources: ["ملخص المتغيرات.pdf"]
+      },
+      {
+        id: "4",
+        title: "الدوال والعمليات",
+        duration: "32:45",
+        isCompleted: true,
+        videoUrl: "https://youtu.be/GhTu53CRtJc?si=iDQN6rWAt0ElzP_X",
+        description: "تعلم كيفية إنشاء واستخدام الدوال"
+      },
+      {
+        id: "5",
+        title: "التحكم في التدفق",
+        duration: "28:33",
+        isCompleted: true,
+        videoUrl: "https://youtu.be/GhTu53CRtJc?si=iDQN6rWAt0ElzP_X",
+        description: "استخدام الشروط والحلقات في البرمجة"
+      },
+      {
+        id: "6",
+        title: "المصفوفات والكائنات",
+        duration: "35:12",
+        isCompleted: true,
+        videoUrl: "https://youtu.be/GhTu53CRtJc?si=iDQN6rWAt0ElzP_X",
+        description: "العمل مع هياكل البيانات المعقدة"
+      },
+      {
+        id: "7",
+        title: "معالجة الأخطاء",
+        duration: "29:48",
+        isCompleted: true,
+        videoUrl: "https://youtu.be/GhTu53CRtJc?si=iDQN6rWAt0ElzP_X",
+        description: "كيفية التعامل مع الأخطاء في البرمجة"
+      },
+      {
+        id: "8",
+        title: "البرمجة الكائنية",
+        duration: "24:56",
+        isCompleted: true,
+        videoUrl: "https://youtu.be/GhTu53CRtJc?si=iDQN6rWAt0ElzP_X",
+        description: "مفاهيم البرمجة الموجهة للكائنات"
+      },
+      {
+        id: "9",
+        title: "التعامل مع الملفات",
+        duration: "31:22",
+        isCompleted: false,
+        videoUrl: "https://youtu.be/GhTu53CRtJc?si=iDQN6rWAt0ElzP_X",
+        description: "قراءة وكتابة الملفات في البرمجة"
+      },
+      {
+        id: "10",
+        title: "قواعد البيانات الأساسية",
+        duration: "26:18",
+        isCompleted: false,
+        videoUrl: "https://youtu.be/GhTu53CRtJc?si=iDQN6rWAt0ElzP_X",
+        description: "مقدمة لقواعد البيانات وSQL"
+      },
+      {
+        id: "11",
+        title: "تحسين الأداء",
+        duration: "38:42",
+        isCompleted: false,
+        videoUrl: "https://youtu.be/GhTu53CRtJc?si=iDQN6rWAt0ElzP_X",
+        description: "تحسين أداء البرامج والخوارزميات"
+      },
+      {
+        id: "12",
+        title: "مشروع التخرج",
+        duration: "22:15",
+        isCompleted: false,
+        videoUrl: "https://youtu.be/GhTu53CRtJc?si=iDQN6rWAt0ElzP_X",
+        description: "بناء مشروع شامل لتطبيق ما تعلمته"
+      }
+    ]
+  },
+  "2": {
+    id: "2",
+    title: "تطوير تطبيقات الويب",
+    instructor: "أ. سارة خالد",
+    instructorAvatar: "https://images.unsplash.com/photo-1494790108755-2616b612b1c5?w=100&h=100&fit=crop&crop=face",
+    totalLessons: 15,
+    completedLessons: 15,
+    totalDuration: "35 ساعة",
+    category: "تطوير الويب",
+    lessons: [
+      {
+        id: "1",
+        title: "HTML الأساسي",
+        duration: "20:15",
+        isCompleted: true,
+        videoUrl: "https://youtu.be/GhTu53CRtJc?si=iDQN6rWAt0ElzP_X",
+        description: "تعلم أساسيات HTML لبناء صفحات الويب"
+      },
+      {
+        id: "2",
+        title: "CSS للتصميم",
+        duration: "25:30",
+        isCompleted: true,
+        videoUrl: "https://youtu.be/GhTu53CRtJc?si=iDQN6rWAt0ElzP_X",
+        description: "استخدام CSS لتنسيق وتصميم المواقع"
+      },
+      {
+        id: "3",
+        title: "JavaScript التفاعلي",
+        duration: "30:45",
+        isCompleted: true,
+        videoUrl: "https://youtu.be/GhTu53CRtJc?si=iDQN6rWAt0ElzP_X",
+        description: "إضافة التفاعل للمواقع باستخدام JavaScript"
+      }
+      // Add more lessons as needed
+    ]
+  },
+  "3": {
+    id: "3",
+    title: "قواعد البيانات",
+    instructor: "د. أحمد علي",
+    instructorAvatar: "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=100&h=100&fit=crop&crop=face",
+    totalLessons: 10,
+    completedLessons: 4,
+    totalDuration: "28 ساعة",
+    category: "قواعد البيانات",
+    lessons: [
+      {
+        id: "1",
+        title: "مقدمة في قواعد البيانات",
+        duration: "18:20",
+        isCompleted: true,
+        videoUrl: "https://youtu.be/GhTu53CRtJc?si=iDQN6rWAt0ElzP_X",
+        description: "أساسيات قواعد البيانات ومفاهيمها"
+      },
+      {
+        id: "2",
+        title: "SQL الأساسي",
+        duration: "22:45",
+        isCompleted: true,
+        videoUrl: "https://youtu.be/GhTu53CRtJc?si=iDQN6rWAt0ElzP_X",
+        description: "تعلم لغة SQL للتعامل مع قواعد البيانات"
+      }
+      // Add more lessons as needed
+    ]
+  },
+  "4": {
+    id: "4",
+    title: "أمن المعلومات",
+    instructor: "د. فاطمة محمد",
+    instructorAvatar: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=100&h=100&fit=crop&crop=face",
+    totalLessons: 8,
+    completedLessons: 0,
+    totalDuration: "24 ساعة",
+    category: "الأمن السيبراني",
+    lessons: [
+      {
+        id: "1",
+        title: "مقدمة في أمن المعلومات",
+        duration: "15:30",
+        isCompleted: false,
+        videoUrl: "https://youtu.be/GhTu53CRtJc?si=iDQN6rWAt0ElzP_X",
+        description: "أساسيات أمن المعلومات والمخاطر السيبرانية"
+      }
+      // Add more lessons as needed
+    ]
+  },
+  "5": {
+    id: "5",
+    title: "تعلم الآلة",
+    instructor: "د. عمر حسن",
+    instructorAvatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face",
+    totalLessons: 12,
+    completedLessons: 9,
+    totalDuration: "45 ساعة",
+    category: "الذكاء الاصطناعي",
+    lessons: [
+      {
+        id: "1",
+        title: "مقدمة في تعلم الآلة",
+        duration: "20:15",
+        isCompleted: true,
+        videoUrl: "https://youtu.be/GhTu53CRtJc?si=iDQN6rWAt0ElzP_X",
+        description: "أساسيات الذكاء الاصطناعي وتعلم الآلة"
+      }
+      // Add more lessons as needed
+    ]
+  }
 };
 
 export default function Learning() {
   const { courseId } = useParams();
-  const [currentLesson, setCurrentLesson] = useState<Lesson>(mockCourse.lessons[0]);
+  
+  // Get the course data based on courseId, fallback to course "1" if not found
+  const currentCourse = mockCourses[courseId || "1"] || mockCourses["1"];
+  
+  const [currentLesson, setCurrentLesson] = useState<Lesson>(currentCourse.lessons[0]);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState("0:00");
   const [duration, setDuration] = useState("0:00");
+
+  // Update current lesson when course changes
+  useEffect(() => {
+    setCurrentLesson(currentCourse.lessons[0]);
+  }, [courseId, currentCourse]);
 
 
   const handleLessonClick = (lesson: Lesson) => {
@@ -172,25 +291,25 @@ export default function Learning() {
 
   const markAsCompleted = (lessonId: string) => {
     // In a real app, this would update the backend
-    const lesson = mockCourse.lessons.find(l => l.id === lessonId);
+    const lesson = currentCourse.lessons.find(l => l.id === lessonId);
     if (lesson) {
       lesson.isCompleted = true;
-      mockCourse.completedLessons += 1;
+      currentCourse.completedLessons += 1;
     }
   };
 
   const goToNextLesson = () => {
-    const currentIndex = mockCourse.lessons.findIndex(l => l.id === currentLesson.id);
-    if (currentIndex < mockCourse.lessons.length - 1) {
-      setCurrentLesson(mockCourse.lessons[currentIndex + 1]);
+    const currentIndex = currentCourse.lessons.findIndex(l => l.id === currentLesson.id);
+    if (currentIndex < currentCourse.lessons.length - 1) {
+      setCurrentLesson(currentCourse.lessons[currentIndex + 1]);
       setIsPlaying(false);
     }
   };
 
   const goToPreviousLesson = () => {
-    const currentIndex = mockCourse.lessons.findIndex(l => l.id === currentLesson.id);
+    const currentIndex = currentCourse.lessons.findIndex(l => l.id === currentLesson.id);
     if (currentIndex > 0) {
-      setCurrentLesson(mockCourse.lessons[currentIndex - 1]);
+      setCurrentLesson(currentCourse.lessons[currentIndex - 1]);
       setIsPlaying(false);
     }
   };
@@ -199,28 +318,28 @@ export default function Learning() {
     <StudentLayout>
       <div className="h-[calc(100vh-8rem)] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-slate-200 bg-white">
+        <div className="flex items-center justify-between p-4 border-b border-border bg-background">
           <div className="flex items-center space-x-4">
-            <Link to="/">
+            <Link to="/student-dashboard">
               <Button variant="ghost" size="sm">
                 <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Dashboard
+                العودة للوحة التحكم
               </Button>
             </Link>
             <div>
-              <h1 className="text-xl font-bold text-slate-900">{mockCourse.title}</h1>
-              <div className="flex items-center space-x-4 text-sm text-slate-600">
+              <h1 className="text-xl font-bold text-foreground">{currentCourse.title}</h1>
+              <div className="flex items-center space-x-4 text-sm text-muted-foreground">
                 <div className="flex items-center space-x-1">
                   <User className="w-4 h-4" />
-                  <span>{mockCourse.instructor}</span>
+                  <span>{currentCourse.instructor}</span>
                 </div>
                 <div className="flex items-center space-x-1">
                   <BookOpen className="w-4 h-4" />
-                  <span>{mockCourse.completedLessons}/{mockCourse.totalLessons} lessons</span>
+                  <span>{currentCourse.completedLessons}/{currentCourse.totalLessons} دروس</span>
                 </div>
                 <div className="flex items-center space-x-1">
                   <Clock className="w-4 h-4" />
-                  <span>{mockCourse.totalDuration}</span>
+                  <span>{currentCourse.totalDuration}</span>
                 </div>
               </div>
             </div>
@@ -232,22 +351,22 @@ export default function Learning() {
         {/* Main Content */}
         <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-0">
           {/* Lessons Sidebar */}
-          <div className="lg:col-span-1 border-r border-slate-200 bg-slate-50">
-            <div className="p-4 border-b border-slate-200 bg-white">
-              <h2 className="font-semibold text-slate-900">Course Content</h2>
-              <p className="text-sm text-slate-600">{mockCourse.totalLessons} lessons • {mockCourse.totalDuration}</p>
+          <div className="lg:col-span-1 border-r border-border bg-muted/30">
+            <div className="p-4 border-b border-border bg-background">
+              <h2 className="font-semibold text-foreground">محتوى الدورة</h2>
+              <p className="text-sm text-muted-foreground">{currentCourse.totalLessons} دروس • {currentCourse.totalDuration}</p>
             </div>
             
             <div className="overflow-y-auto h-full">
               <div className="space-y-1 p-2">
-                {mockCourse.lessons.map((lesson, index) => (
+                {currentCourse.lessons.map((lesson, index) => (
                   <div
                     key={lesson.id}
                     onClick={() => handleLessonClick(lesson)}
                     className={`p-3 rounded-lg cursor-pointer transition-colors ${
                       currentLesson.id === lesson.id
                         ? "bg-primary/10 border border-primary/20"
-                        : "hover:bg-white hover:shadow-sm"
+                        : "hover:bg-accent hover:shadow-sm"
                     }`}
                   >
                     <div className="flex items-start space-x-3">
@@ -255,13 +374,13 @@ export default function Learning() {
                         {lesson.isCompleted ? (
                           <CheckCircle className="w-5 h-5 text-success" />
                         ) : (
-                          <Circle className="w-5 h-5 text-slate-400" />
+                          <Circle className="w-5 h-5 text-muted-foreground" />
                         )}
                       </div>
                       
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium text-slate-700">
+                          <span className="text-sm font-medium text-foreground">
                             {index + 1}. {lesson.title}
                           </span>
                           {currentLesson.id === lesson.id && (
@@ -270,11 +389,11 @@ export default function Learning() {
                         </div>
                         
                         <div className="flex items-center space-x-2 mt-1">
-                          <Clock className="w-3 h-3 text-slate-500" />
-                          <span className="text-xs text-slate-500">{lesson.duration}</span>
+                          <Clock className="w-3 h-3 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground">{lesson.duration}</span>
                           {lesson.isCompleted && (
                             <Badge variant="secondary" className="text-xs">
-                              Completed
+                              مكتمل
                             </Badge>
                           )}
                         </div>
@@ -300,12 +419,12 @@ export default function Learning() {
             </div>
             
             {/* Video Controls & Info */}
-            <div className="bg-white border-t border-slate-200">
+            <div className="bg-background border-t border-border">
               <div className="p-4">
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h3 className="text-lg font-semibold text-slate-900">{currentLesson.title}</h3>
-                    <p className="text-sm text-slate-600 mt-1">{currentLesson.description}</p>
+                    <h3 className="text-lg font-semibold text-foreground">{currentLesson.title}</h3>
+                    <p className="text-sm text-muted-foreground mt-1">{currentLesson.description}</p>
                   </div>
                   
                   <div className="flex items-center space-x-2">
@@ -313,7 +432,7 @@ export default function Learning() {
                       variant="outline"
                       size="sm"
                       onClick={goToPreviousLesson}
-                      disabled={mockCourse.lessons[0].id === currentLesson.id}
+                      disabled={currentCourse.lessons[0].id === currentLesson.id}
                     >
                       <SkipBack className="w-4 h-4" />
                     </Button>
@@ -324,7 +443,7 @@ export default function Learning() {
                         size="sm"
                       >
                         <CheckCircle className="w-4 h-4 mr-2" />
-                        Mark Complete
+                        تمييز كمكتمل
                       </Button>
                     )}
                     
@@ -332,7 +451,7 @@ export default function Learning() {
                       variant="outline"
                       size="sm"
                       onClick={goToNextLesson}
-                      disabled={mockCourse.lessons[mockCourse.lessons.length - 1].id === currentLesson.id}
+                      disabled={currentCourse.lessons[currentCourse.lessons.length - 1].id === currentLesson.id}
                     >
                       <SkipForward className="w-4 h-4" />
                     </Button>
@@ -341,8 +460,8 @@ export default function Learning() {
                 
                 {/* Lesson Resources */}
                 {currentLesson.resources && currentLesson.resources.length > 0 && (
-                  <div className="border-t border-slate-200 pt-4">
-                    <h4 className="font-medium text-slate-900 mb-2">Lesson Resources</h4>
+                  <div className="border-t border-border pt-4">
+                    <h4 className="font-medium text-foreground mb-2">موارد الدرس</h4>
                     <div className="flex flex-wrap gap-2">
                       {currentLesson.resources.map((resource, index) => (
                         <Button key={index} variant="outline" size="sm">
@@ -355,20 +474,20 @@ export default function Learning() {
                 )}
                 
                 {/* Quick Actions */}
-                <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-200">
+                <div className="flex items-center justify-between mt-4 pt-4 border-t border-border">
                   <div className="flex items-center space-x-2">
                     <Button variant="ghost" size="sm">
                       <MessageSquare className="w-4 h-4 mr-2" />
-                      Q&A
+                      أسئلة وأجوبة
                     </Button>
                     <Button variant="ghost" size="sm">
                       <Star className="w-4 h-4 mr-2" />
-                      Rate Lesson
+                      تقييم الدرس
                     </Button>
                   </div>
                   
-                  <div className="text-sm text-slate-600">
-                    Lesson {mockCourse.lessons.findIndex(l => l.id === currentLesson.id) + 1} of {mockCourse.totalLessons}
+                  <div className="text-sm text-muted-foreground">
+                    الدرس {currentCourse.lessons.findIndex(l => l.id === currentLesson.id) + 1} من {currentCourse.totalLessons}
                   </div>
                 </div>
               </div>

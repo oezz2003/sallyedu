@@ -50,9 +50,9 @@ interface CourseDetailsModalProps {
   course: Course;
   isOpen: boolean;
   onClose: () => void;
-  onAddToCart: (courseId: string) => void;
+  onAddToCart?: (courseId: string) => void;
   onToggleWishlist: (courseId: string) => void;
-  isInCart: boolean;
+  isInCart?: boolean;
   isInWishlist: boolean;
 }
 
@@ -402,14 +402,16 @@ export default function CourseDetailsModal({
 
               {/* Action Buttons */}
               <div className="space-y-3 mb-6">
-                <Button
-                  onClick={() => onAddToCart(course.id)}
-                  className="w-full"
-                  size="lg"
-                >
-                  <ShoppingCart className="w-4 h-4 mr-2" />
-                  {isInCart ? "Added to Cart" : "Add to Cart"}
-                </Button>
+                {onAddToCart && (
+                  <Button
+                    onClick={() => onAddToCart(course.id)}
+                    className="w-full"
+                    size="lg"
+                  >
+                    <ShoppingCart className="w-4 h-4 mr-2" />
+                    {isInCart ? "Added to Cart" : "Add to Cart"}
+                  </Button>
+                )}
                 
                 <Button
                   variant="outline"

@@ -10,6 +10,7 @@ import {
   Settings,
 } from "lucide-react";
 import { useAuth } from "@/lib/useAuth";
+import { useI18n } from "@/lib/i18n";
 
 interface ProfileDropdownProps {
   onCustomerServiceClick: () => void;
@@ -21,6 +22,7 @@ export default function ProfileDropdown({
   onLogout,
 }: ProfileDropdownProps) {
   const { user } = useAuth();
+  const { t, language } = useI18n();
   const [isOpen, setIsOpen] = useState(false);
   const [profile, setProfile] = useState<{ firstName: string; lastName: string; email: string } | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -29,12 +31,12 @@ export default function ProfileDropdown({
   useEffect(() => {
     if (user) {
       setProfile({
-        firstName: user.firstName || "أحمد",
-        lastName: user.lastName || "محمد",
+        firstName: user.firstName || (language === "ar" ? "أحمد" : "Ahmed"),
+        lastName: user.lastName || (language === "ar" ? "محمد" : "Mohammed"),
         email: user.email || "student@example.com",
       });
     }
-  }, [user]);
+  }, [user, language]);
 
   // Close on outside click
   useEffect(() => {
@@ -49,7 +51,7 @@ export default function ProfileDropdown({
 
   const initials = profile
     ? `${profile.firstName.charAt(0)}${profile.lastName.charAt(0)}`
-    : "أم";
+    : (language === "ar" ? "أم" : "AM");
 
   return (
     <div className="relative" ref={dropdownRef}>
@@ -81,14 +83,14 @@ export default function ProfileDropdown({
             {/* Menu */}
             <div className="py-2">
               <Link
-                to="/profile"
+                to="/edit-profile"
                 onClick={() => setIsOpen(false)}
                 className="flex items-center px-4 py-3 text-foreground hover:bg-accent transition-colors"
               >
                 <User className="w-5 h-5 mr-3 text-muted-foreground" />
                 <div>
-                  <p className="font-medium">تعديل الملف الشخصي</p>
-                  <p className="text-xs text-muted-foreground">إدارة حسابك</p>
+                  <p className="font-medium">{t("profile.editProfile")}</p>
+                  <p className="text-xs text-muted-foreground">{t("profile.editProfileDesc")}</p>
                 </div>
               </Link>
 
@@ -101,8 +103,8 @@ export default function ProfileDropdown({
               >
                 <HeadphonesIcon className="w-5 h-5 mr-3 text-muted-foreground" />
                 <div>
-                  <p className="font-medium">خدمة العملاء</p>
-                  <p className="text-xs text-muted-foreground">المساعدة والدعم</p>
+                  <p className="font-medium">{t("profile.customerService")}</p>
+                  <p className="text-xs text-muted-foreground">{t("profile.customerServiceDesc")}</p>
                 </div>
               </button>
 
@@ -116,8 +118,8 @@ export default function ProfileDropdown({
                 >
                   <LogOut className="w-5 h-5 mr-3" />
                   <div>
-                    <p className="font-medium">تسجيل الخروج</p>
-                    <p className="text-xs text-destructive/70">خروج</p>
+                    <p className="font-medium">{t("profile.logout")}</p>
+                    <p className="text-xs text-destructive/70">{t("profile.logoutDesc")}</p>
                   </div>
                 </button>
               </div>

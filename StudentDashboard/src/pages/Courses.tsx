@@ -1037,11 +1037,11 @@ export default function Courses() {
     console.log("Attempting to navigate to course:", courseId);
 
     try {
-      navigate(`/course-details?id=${courseId}`);
+      navigate(`/course/${courseId}`);
     } catch (error) {
       console.error("Navigation failed, using window.location:", error);
       // Fallback to window.location
-      window.location.href = `/course-details?id=${courseId}`;
+      window.location.href = `/course/${courseId}`;
     }
   };
 
@@ -1071,11 +1071,15 @@ export default function Courses() {
       {/* Hero Section */}
       <section className="py-20 bg-gradient-to-br from-primary/10 via-background to-secondary/10 relative overflow-hidden">
         <div className="absolute inset-0">
-          <FloatingElement className="absolute top-20 right-20 w-64 h-64 bg-primary/5 rounded-full blur-3xl" />
+          <FloatingElement className="absolute top-20 right-20 w-64 h-64 bg-primary/5 rounded-full blur-3xl">
+            <div></div>
+          </FloatingElement>
           <FloatingElement
             className="absolute bottom-20 left-20 w-80 h-80 bg-secondary/10 rounded-full blur-3xl"
             duration={8000}
-          />
+          >
+            <div></div>
+          </FloatingElement>
         </div>
 
         <div className="container mx-auto px-4 text-center relative">
@@ -1099,7 +1103,7 @@ export default function Courses() {
         <div className="container mx-auto px-4">
           {/* Search and Filter Section */}
           <AnimatedSection
-            animation="slide-up"
+            animation="fade-up"
             delay={200}
             className="max-w-4xl mx-auto"
           >
@@ -1168,7 +1172,7 @@ export default function Courses() {
 
               <div className="flex items-center justify-between">
                 <p className="text-sm text-muted-foreground">
-                  {t("courses.results", { count: sortedCourses.length })}
+                  {sortedCourses.length} {t("courses.results")}
                 </p>
                 <div className="flex items-center gap-2">
                   <Button
@@ -1204,7 +1208,7 @@ export default function Courses() {
               {sortedCourses.map((course) => (
                 <div key={course.id}>
                   <Link
-                    to={`/course-details?id=${course.id}`}
+                    to={`/course/${course.id}`}
                     className="block h-full"
                   >
                     <Card

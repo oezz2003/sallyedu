@@ -1,7 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import StudentLayout from "@/components/studentLayout";
 import {
@@ -14,15 +17,14 @@ import {
   Edit3,
   Eye,
   EyeOff,
+  Phone,
+  Mail,
+  Calendar,
+  MapPin,
+  Globe,
 } from "lucide-react";
 import { useAuth } from "@/lib/useAuth";
-import { auth, db } from "@/lib/firebase";
-import { doc, getDoc, setDoc } from "firebase/firestore";
-import {
-  EmailAuthProvider,
-  reauthenticateWithCredential,
-  updatePassword,
-} from "firebase/auth";
+import { useI18n } from "@/lib/i18n";
 
 interface UserProfile {
   firstName: string;
@@ -43,119 +45,91 @@ interface UserProfile {
 
 export default function EditProfile() {
   const { user } = useAuth();
-  const uid = user?.uid;
+  const { t, language } = useI18n();
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
   const [activeTab, setActiveTab] = useState<"personal" | "security" | "notifications">(
     "personal"
   );
 
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-
-  // Load profile from Firestore
-  useEffect(() => {
-    if (!uid) return;
-    (async () => {
-      const docRef = doc(db, "users", uid);
-      const snap = await getDoc(docRef);
-      if (snap.exists()) {
-        setProfile(snap.data() as UserProfile);
-      } else {
-        setProfile({
-          firstName: "",
-          lastName: "",
-          email: user.email || "",
-          phone: "",
-          dateOfBirth: "",
-          address: "",
-          // city: "",
-          country: "",
-          bio: "",
-          // website: "",
-          currentPassword: "",
-          newPassword: "",
-          confirmPassword: "",
-          emailNotifications: true,
-          courseNotifications: true,
-          marketingEmails: false,
-        });
-      }
-    })();
-  }, [uid, user]);
+  const [profile, setProfile] = useState<UserProfile>({
+    firstName: user?.firstName || (language === "ar" ? "أحمد" : "Ahmed"),
+    lastName: user?.lastName || (language === "ar" ? "محمد" : "Mohammed"),
+    email: user?.email || "student@example.com",
+    phone: "+966 50 123 4567",
+    dateOfBirth: "1995-01-15",
+    address: language === "ar" ? "الرياض، المملكة العربية السعودية" : "Riyadh, Saudi Arabia",
+    country: language === "ar" ? "المملكة العربية السعودية" : "Saudi Arabia",
+    bio: language === "ar" 
+      ? "طالب متحمس في أكاديمية التعلم الذكي، أسعى لتطوير مهاراتي في البرمجة وتطوير الويب."
+      : "Enthusiastic student at Smart Learning Academy, passionate about developing programming and web development skills.",
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+    emailNotifications: true,
+    courseNotifications: true,
+    marketingEmails: false,
+  });
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
-    if (!profile) return;
     const { name, value, type, checked } = e.target as HTMLInputElement;
     setProfile((p) => ({
-      ...p!,
+      ...p,
       [name]: type === "checkbox" ? checked : value,
     }));
   };
 
   const handleSave = async () => {
-    if (!uid || !profile) return;
     setIsSaving(true);
 
     try {
-      // 1) Handle password update if on security tab
-      if (
-        activeTab === "security" &&
-        profile.currentPassword &&
-        profile.newPassword &&
-        profile.confirmPassword
-      ) {
+      // Simulate saving delay
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      // Validate password change if attempting to change it
+      if (activeTab === "security" && profile.newPassword) {
         if (profile.newPassword !== profile.confirmPassword) {
-          throw new Error("New passwords do not match.");
+          throw new Error(t("error.passwordMatch"));
         }
-        const credential = EmailAuthProvider.credential(
-          auth.currentUser!.email!,
-          profile.currentPassword
-        );
-        await reauthenticateWithCredential(auth.currentUser!, credential);
-        await updatePassword(auth.currentUser!, profile.newPassword);
+        if (!profile.currentPassword) {
+          throw new Error(t("error.required"));
+        }
       }
 
-      // 2) Prepare Firestore data (exclude password fields)
-      const {
-        currentPassword,
-        newPassword,
-        confirmPassword,
-        ...toSave
-      } = profile;
+      // Save to localStorage (simulation)
+      const updatedUser = {
+        ...user,
+        firstName: profile.firstName,
+        lastName: profile.lastName,
+        email: profile.email,
+        displayName: `${profile.firstName} ${profile.lastName}`,
+      };
+      localStorage.setItem("defaultUser", JSON.stringify(updatedUser));
 
-      // 3) Merge into Firestore
-      await setDoc(doc(db, "users", uid), toSave, { merge: true });
+      // Clear password fields after successful save
+      if (activeTab === "security") {
+        setProfile((p) => ({
+          ...p,
+          currentPassword: "",
+          newPassword: "",
+          confirmPassword: "",
+        }));
+      }
 
-      // 4) Clear edit state
       setIsEditing(false);
-      setProfile((p) =>
-        p
-          ? {
-              ...p,
-              currentPassword: "",
-              newPassword: "",
-              confirmPassword: "",
-            }
-          : p
-      );
+      // In a real app, you would show a success toast here
+      alert(t("success.saved"));
     } catch (err: any) {
       console.error("Save failed", err);
-      window.alert(err.message || "Failed to save profile.");
+      alert(err.message || t("error.general"));
     } finally {
       setIsSaving(false);
     }
   };
-
-  if (!profile) {
-    return (
-      <StudentLayout>
-        <div className="p-8 text-center">Loading profile…</div>
-      </StudentLayout>
-    );
-  }
 
   return (
     <StudentLayout>
@@ -163,15 +137,15 @@ export default function EditProfile() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <Link to="/">
+            <Link to="/student-dashboard">
               <Button variant="ghost" size="sm">
-                <ArrowLeft className="w-4 h-4 mr-2" /> Back to Dashboard
+                <ArrowLeft className="w-4 h-4 mr-2" /> {t("editProfile.backToDashboard")}
               </Button>
             </Link>
             <div>
-              <h1 className="text-3xl font-bold text-slate-900">Edit Profile</h1>
-              <p className="text-slate-600">
-                Manage your account settings and preferences
+              <h1 className="text-3xl font-bold text-foreground">{t("editProfile.title")}</h1>
+              <p className="text-muted-foreground">
+                {t("editProfile.subtitle")}
               </p>
             </div>
           </div>
@@ -179,7 +153,7 @@ export default function EditProfile() {
             {isEditing ? (
               <>
                 <Button variant="outline" onClick={() => setIsEditing(false)}>
-                  Cancel
+                  {t("editProfile.cancel")}
                 </Button>
                 <Button
                   onClick={handleSave}
@@ -189,345 +163,363 @@ export default function EditProfile() {
                   {isSaving ? (
                     <div className="flex items-center space-x-2">
                       <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      <span>Saving...</span>
+                      <span>{t("editProfile.saving")}</span>
                     </div>
                   ) : (
                     <div className="flex items-center space-x-2">
                       <Save className="w-4 h-4" />
-                      <span>Save</span>
+                      <span>{t("editProfile.save")}</span>
                     </div>
                   )}
                 </Button>
               </>
             ) : (
               <Button onClick={() => setIsEditing(true)}>
-                <Edit3 className="w-4 h-4 mr-2" /> Edit Profile
+                <Edit3 className="w-4 h-4 mr-2" />
+                Edit
               </Button>
             )}
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Profile Card */}
-          <div className="lg:col-span-1">
-            <Card>
-              <CardContent className="p-6 text-center">
-                <div className="relative inline-block mb-4">
-                  <div className="w-24 h-24 bg-gradient-to-r from-primary to-purple-600 rounded-full flex items-center justify-center mx-auto">
-                    <span className="text-white text-2xl font-bold">
-                      {profile.firstName.charAt(0)}
-                      {profile.lastName.charAt(0)}
-                    </span>
-                  </div>
-                  {isEditing && (
-                    <button className="absolute bottom-0 right-0 w-8 h-8 bg-white rounded-full shadow-lg border border-slate-200 flex items-center justify-center hover:bg-slate-50">
-                      <Camera className="w-4 h-4 text-slate-600" />
-                    </button>
-                  )}
+        {/* Profile Picture Section */}
+        <Card className="bg-card border-border">
+          <CardContent className="p-6">
+            <div className="flex items-center space-x-6">
+              <div className="relative">
+                <div className="w-24 h-24 bg-gradient-to-r from-primary to-purple-600 rounded-full flex items-center justify-center">
+                  <span className="text-white text-2xl font-bold">
+                    {profile.firstName.charAt(0)}{profile.lastName.charAt(0)}
+                  </span>
                 </div>
-                <h3 className="text-lg font-semibold text-slate-900">
+                {isEditing && (
+                  <button className="absolute -bottom-2 -right-2 w-8 h-8 bg-primary rounded-full flex items-center justify-center text-white hover:bg-primary/80 transition-colors">
+                    <Camera className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+              <div>
+                <h3 className="text-xl font-semibold text-foreground">
                   {profile.firstName} {profile.lastName}
                 </h3>
-                <p className="text-slate-600 text-sm">{profile.email}</p>
-                <div className="mt-4 space-y-2">
-                  <Badge variant="secondary" className="text-xs">
-                    Student Level: Advanced
-                  </Badge>
-                  <Badge variant="outline" className="text-xs">
-                    Member since {new Date().getFullYear()}
-                  </Badge>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Main Content */}
-          <div className="lg:col-span-3">
-            {/* Tabs */}
-            <div className="flex space-x-1 bg-slate-100 rounded-lg p-1 mb-6">
-              {[
-                { id: "personal", label: "Personal", icon: User },
-                { id: "security", label: "Security", icon: Shield },
-                { id: "notifications", label: "Notifications", icon: Bell },
-              ].map((tab) => (
-                <Button
-                  key={tab.id}
-                  variant={activeTab === tab.id ? "default" : "ghost"}
-                  size="sm"
-                  onClick={() => setActiveTab(tab.id as any)}
-                  className="flex-1 flex items-center space-x-2"
-                >
-                  <tab.icon className="w-4 h-4" />
-                  <span>{tab.label}</span>
-                </Button>
-              ))}
-            </div>
-
-            <Card>
-              <CardContent className="p-6">
-                {/* Personal Tab */}
-                {activeTab === "personal" && (
-                  <div className="space-y-6">
-                    {/* Name */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">
-                          First Name
-                        </label>
-                        <input
-                          type="text"
-                          name="firstName"
-                          value={profile.firstName}
-                          onChange={handleInputChange}
-                          disabled={!isEditing}
-                          className="w-full px-3 py-2 border rounded-lg disabled:bg-slate-50"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">
-                          Last Name
-                        </label>
-                        <input
-                          type="text"
-                          name="lastName"
-                          value={profile.lastName}
-                          onChange={handleInputChange}
-                          disabled={!isEditing}
-                          className="w-full px-3 py-2 border rounded-lg disabled:bg-slate-50"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Contact */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">
-                          Email
-                        </label>
-                        <input
-                          type="email"
-                          name="email"
-                          value={profile.email}
-                          disabled
-                          className="w-full px-3 py-2 border rounded-lg bg-slate-100 text-slate-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">
-                          Phone
-                        </label>
-                        <input
-                          type="tel"
-                          name="phone"
-                          value={profile.phone}
-                          onChange={handleInputChange}
-                          disabled={!isEditing}
-                          className="w-full px-3 py-2 border rounded-lg disabled:bg-slate-50"
-                        />
-                      </div>
-                    </div>
-
-                    {/* DOB & Country */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">
-                          Date of Birth
-                        </label>
-                        <input
-                          type="date"
-                          name="dateOfBirth"
-                          value={profile.dateOfBirth}
-                          onChange={handleInputChange}
-                          disabled={!isEditing}
-                          className="w-full px-3 py-2 border rounded-lg disabled:bg-slate-50"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">
-                          Country
-                        </label>
-                        <input
-                          type="text"
-                          name="country"
-                          value={profile.country}
-                          onChange={handleInputChange}
-                          disabled={!isEditing}
-                          className="w-full px-3 py-2 border rounded-lg disabled:bg-slate-50"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Address & City */}
-                    <div className="">
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">
-                          Address
-                        </label>
-                        <input
-                          type="text"
-                          name="address"
-                          value={profile.address}
-                          onChange={handleInputChange}
-                          disabled={!isEditing}
-                          className="w-full px-3 py-2 border rounded-lg disabled:bg-slate-50"
-                        />
-                      </div>
-                      {/* <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">
-                          City
-                        </label>
-                        <input
-                          type="text"
-                          name="city"
-                          value={profile.city}
-                          onChange={handleInputChange}
-                          disabled={!isEditing}
-                          className="w-full px-3 py-2 border rounded-lg disabled:bg-slate-50"
-                        />
-                      </div> */}
-                    </div>
-
-                    {/* Website
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">
-                        Website
-                      </label>
-                      <input
-                        type="url"
-                        name="website"
-                        value={profile.website}
-                        onChange={handleInputChange}
-                        disabled={!isEditing}
-                        className="w-full px-3 py-2 border rounded-lg disabled:bg-slate-50"
-                      />
-                    </div> */}
-
-                    {/* Bio */}
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">
-                        Bio
-                      </label>
-                      <textarea
-                        name="bio"
-                        value={profile.bio}
-                        onChange={handleInputChange}
-                        disabled={!isEditing}
-                        rows={4}
-                        className="w-full px-3 py-2 border rounded-lg disabled:bg-slate-50"
-                      />
-                    </div>
-                  </div>
+                <p className="text-muted-foreground">{profile.email}</p>
+                {isEditing && (
+                  <Button variant="outline" size="sm" className="mt-2">
+                    <Camera className="w-4 h-4 mr-2" />
+                    {t("editProfile.changePhoto")}
+                  </Button>
                 )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-                {/* Security Tab */}
-                {activeTab === "security" && (
-                  <div className="space-y-6">
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">
-                        Current Password
-                      </label>
-                      <div className="relative">
-                        <input
-                          type={showPassword ? "text" : "password"}
-                          name="currentPassword"
-                          value={profile.currentPassword}
-                          onChange={handleInputChange}
-                          disabled={!isEditing}
-                          className="w-full px-3 py-2 pr-10 border rounded-lg disabled:bg-slate-50"
-                          placeholder="Enter current password"
-                        />
+        {/* Tabs */}
+        <div className="flex space-x-1 bg-muted/50 rounded-lg p-1 mb-6">
+          {[
+            { id: "personal", label: t("editProfile.personal"), icon: User },
+            { id: "security", label: t("editProfile.security"), icon: Shield },
+            { id: "notifications", label: t("editProfile.notifications"), icon: Bell },
+          ].map((tab) => (
+            <Button
+              key={tab.id}
+              variant={activeTab === tab.id ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setActiveTab(tab.id as any)}
+              className="flex-1 flex items-center space-x-2"
+            >
+              <tab.icon className="w-4 h-4" />
+              <span>{tab.label}</span>
+            </Button>
+          ))}
+        </div>
+
+        <Card className="bg-card border-border">
+          <CardContent className="p-6">
+            {/* Personal Tab */}
+            {activeTab === "personal" && (
+              <div className="space-y-6">
+                {/* Name */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="firstName" className="text-foreground">
+                      {t("editProfile.firstName")}
+                    </Label>
+                    <Input
+                      id="firstName"
+                      name="firstName"
+                      value={profile.firstName}
+                      onChange={handleInputChange}
+                      disabled={!isEditing}
+                      className="bg-background border-border text-foreground disabled:bg-muted"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="lastName" className="text-foreground">
+                      {t("editProfile.lastName")}
+                    </Label>
+                    <Input
+                      id="lastName"
+                      name="lastName"
+                      value={profile.lastName}
+                      onChange={handleInputChange}
+                      disabled={!isEditing}
+                      className="bg-background border-border text-foreground disabled:bg-muted"
+                    />
+                  </div>
+                </div>
+
+                {/* Contact */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="email" className="text-foreground">
+                      <Mail className="w-4 h-4 inline mr-2" />
+                      {t("editProfile.email")}
+                    </Label>
+                    <Input
+                      id="email"
+                      name="email"
+                      type="email"
+                      value={profile.email}
+                      onChange={handleInputChange}
+                      disabled={!isEditing}
+                      className="bg-background border-border text-foreground disabled:bg-muted"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="phone" className="text-foreground">
+                      <Phone className="w-4 h-4 inline mr-2" />
+                      {t("editProfile.phone")}
+                    </Label>
+                    <Input
+                      id="phone"
+                      name="phone"
+                      value={profile.phone}
+                      onChange={handleInputChange}
+                      disabled={!isEditing}
+                      className="bg-background border-border text-foreground disabled:bg-muted"
+                    />
+                  </div>
+                </div>
+
+                {/* Personal Details */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="dateOfBirth" className="text-foreground">
+                      <Calendar className="w-4 h-4 inline mr-2" />
+                      {t("editProfile.dateOfBirth")}
+                    </Label>
+                    <Input
+                      id="dateOfBirth"
+                      name="dateOfBirth"
+                      type="date"
+                      value={profile.dateOfBirth}
+                      onChange={handleInputChange}
+                      disabled={!isEditing}
+                      className="bg-background border-border text-foreground disabled:bg-muted"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="country" className="text-foreground">
+                      <Globe className="w-4 h-4 inline mr-2" />
+                      {t("editProfile.country")}
+                    </Label>
+                    <Input
+                      id="country"
+                      name="country"
+                      value={profile.country}
+                      onChange={handleInputChange}
+                      disabled={!isEditing}
+                      className="bg-background border-border text-foreground disabled:bg-muted"
+                    />
+                  </div>
+                </div>
+
+                {/* Address */}
+                <div className="space-y-2">
+                  <Label htmlFor="address" className="text-foreground">
+                    <MapPin className="w-4 h-4 inline mr-2" />
+                    {t("editProfile.address")}
+                  </Label>
+                  <Input
+                    id="address"
+                    name="address"
+                    value={profile.address}
+                    onChange={handleInputChange}
+                    disabled={!isEditing}
+                    className="bg-background border-border text-foreground disabled:bg-muted"
+                  />
+                </div>
+
+                {/* Bio */}
+                <div className="space-y-2">
+                  <Label htmlFor="bio" className="text-foreground">
+                    {t("editProfile.bio")}
+                  </Label>
+                  <Textarea
+                    id="bio"
+                    name="bio"
+                    value={profile.bio}
+                    onChange={handleInputChange}
+                    disabled={!isEditing}
+                    rows={4}
+                    className="bg-background border-border text-foreground disabled:bg-muted resize-none"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Security Tab */}
+            {activeTab === "security" && (
+              <div className="space-y-6">
+                <div className="bg-muted/50 p-4 rounded-lg border border-border">
+                  <h3 className="text-lg font-semibold text-foreground mb-2">
+                    {t("editProfile.security")}
+                  </h3>
+                  <p className="text-muted-foreground text-sm mb-4">
+                    Update your password to keep your account secure
+                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="currentPassword" className="text-foreground">
+                      {t("editProfile.currentPassword")}
+                    </Label>
+                    <div className="relative">
+                      <Input
+                        id="currentPassword"
+                        name="currentPassword"
+                        type={showCurrentPassword ? "text" : "password"}
+                        value={profile.currentPassword}
+                        onChange={handleInputChange}
+                        disabled={!isEditing}
+                        className="bg-background border-border text-foreground disabled:bg-muted pr-10"
+                      />
+                      {isEditing && (
                         <button
                           type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2"
+                          onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                         >
-                          {showPassword ? (
-                            <EyeOff className="w-4 h-4" />
-                          ) : (
-                            <Eye className="w-4 h-4" />
-                          )}
+                          {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                         </button>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">
-                          New Password
-                        </label>
-                        <input
-                          type="password"
-                          name="newPassword"
-                          value={profile.newPassword}
-                          onChange={handleInputChange}
-                          disabled={!isEditing}
-                          className="w-full px-3 py-2 border rounded-lg disabled:bg-slate-50"
-                          placeholder="Enter new password"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">
-                          Confirm Password
-                        </label>
-                        <input
-                          type="password"
-                          name="confirmPassword"
-                          value={profile.confirmPassword}
-                          onChange={handleInputChange}
-                          disabled={!isEditing}
-                          className="w-full px-3 py-2 border rounded-lg disabled:bg-slate-50"
-                          placeholder="Confirm new password"
-                        />
-                      </div>
+                      )}
                     </div>
                   </div>
-                )}
 
-                {/* Notifications Tab */}
-                {activeTab === "notifications" && (
-                  <div className="space-y-6">
-                    {(
-                      [
-                        {
-                          name: "emailNotifications",
-                          label: "Email Notifications",
-                          desc: "Receive important updates via email",
-                        },
-                        {
-                          name: "courseNotifications",
-                          label: "Course Notifications",
-                          desc: "Get notified about course updates",
-                        },
-                        {
-                          name: "marketingEmails",
-                          label: "Marketing Emails",
-                          desc: "Receive promotional offers",
-                        },
-                      ] as const
-                    ).map(({ name, label, desc }) => (
-                      <div
-                        key={name}
-                        className="flex items-center justify-between p-4 border rounded-lg"
-                      >
-                        <div>
-                          <h4 className="font-medium text-slate-900">{label}</h4>
-                          <p className="text-sm text-slate-600">{desc}</p>
-                        </div>
-                        <input
-                          type="checkbox"
-                          name={name}
-                          checked={profile[name]}
-                          onChange={handleInputChange}
-                          disabled={!isEditing}
-                          className="w-4 h-4 rounded focus:ring-primary"
-                        />
-                      </div>
-                    ))}
+                  <div className="space-y-2">
+                    <Label htmlFor="newPassword" className="text-foreground">
+                      {t("editProfile.newPassword")}
+                    </Label>
+                    <div className="relative">
+                      <Input
+                        id="newPassword"
+                        name="newPassword"
+                        type={showNewPassword ? "text" : "password"}
+                        value={profile.newPassword}
+                        onChange={handleInputChange}
+                        disabled={!isEditing}
+                        className="bg-background border-border text-foreground disabled:bg-muted pr-10"
+                      />
+                      {isEditing && (
+                        <button
+                          type="button"
+                          onClick={() => setShowNewPassword(!showNewPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        >
+                          {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      )}
+                    </div>
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="confirmPassword" className="text-foreground">
+                      {t("editProfile.confirmPassword")}
+                    </Label>
+                    <Input
+                      id="confirmPassword"
+                      name="confirmPassword"
+                      type="password"
+                      value={profile.confirmPassword}
+                      onChange={handleInputChange}
+                      disabled={!isEditing}
+                      className="bg-background border-border text-foreground disabled:bg-muted"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Notifications Tab */}
+            {activeTab === "notifications" && (
+              <div className="space-y-6">
+                <div className="bg-muted/50 p-4 rounded-lg border border-border">
+                  <h3 className="text-lg font-semibold text-foreground mb-2">
+                    {t("editProfile.notifications")}
+                  </h3>
+                  <p className="text-muted-foreground text-sm mb-4">
+                    Manage your notification preferences
+                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-4 border border-border rounded-lg bg-background">
+                    <div>
+                      <Label className="text-foreground font-medium">
+                        {t("editProfile.emailNotifications")}
+                      </Label>
+                      <p className="text-sm text-muted-foreground">Receive email notifications about your account</p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      name="emailNotifications"
+                      checked={profile.emailNotifications}
+                      onChange={handleInputChange}
+                      disabled={!isEditing}
+                      className="h-4 w-4 rounded border-border text-primary focus:ring-primary disabled:opacity-50"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between p-4 border border-border rounded-lg bg-background">
+                    <div>
+                      <Label className="text-foreground font-medium">
+                        {t("editProfile.courseNotifications")}
+                      </Label>
+                      <p className="text-sm text-muted-foreground">Get notified about course updates and new lessons</p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      name="courseNotifications"
+                      checked={profile.courseNotifications}
+                      onChange={handleInputChange}
+                      disabled={!isEditing}
+                      className="h-4 w-4 rounded border-border text-primary focus:ring-primary disabled:opacity-50"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between p-4 border border-border rounded-lg bg-background">
+                    <div>
+                      <Label className="text-foreground font-medium">
+                        {t("editProfile.marketingEmails")}
+                      </Label>
+                      <p className="text-sm text-muted-foreground">Receive marketing emails and promotional offers</p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      name="marketingEmails"
+                      checked={profile.marketingEmails}
+                      onChange={handleInputChange}
+                      disabled={!isEditing}
+                      className="h-4 w-4 rounded border-border text-primary focus:ring-primary disabled:opacity-50"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </StudentLayout>
   );

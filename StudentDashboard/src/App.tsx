@@ -24,6 +24,7 @@ import Rewards from "./pages/Rewards";
 import Store from "./pages/Store";
 import StudentDashboard from "./pages/studetDashboard";
 import EditProfile from "./pages/EditProfile";
+import Learning from "./pages/Learning";
 
 // Auth imports
 import { AuthProvider } from "@/lib/useAuth";
@@ -56,8 +57,9 @@ export default function App() {
                   
                                        {/* Dashboard Routes - No Protection Needed */}
                      <Route path="/student-dashboard" element={<StudentDashboard />} />
-                     <Route path="/profile" element={<EditProfile />} />
+                     <Route path="/edit-profile" element={<EditProfile />} />
                      <Route path="/Store" element={<Store />} />
+                     <Route path="/learn/:courseId" element={<Learning />} />
                   
                   {/* Catch-all */}
                   <Route path="*" element={<NotFound />} />
