@@ -402,14 +402,24 @@ export default function CourseDetailsModal({
 
               {/* Action Buttons */}
               <div className="space-y-3 mb-6">
-                {onAddToCart && (
+                {onAddToCart ? (
                   <Button
                     onClick={() => onAddToCart(course.id)}
                     className="w-full"
                     size="lg"
                   >
                     <ShoppingCart className="w-4 h-4 mr-2" />
-                    {isInCart ? "Added to Cart" : "Add to Cart"}
+                    {isInCart ? "Added to Cart" : "Buy Now"}
+                  </Button>
+                ) : (
+                  <Button
+                    className="w-full"
+                    size="lg"
+                    variant="secondary"
+                    disabled
+                  >
+                    <CheckCircle className="w-4 h-4 mr-2" />
+                    Enrolled
                   </Button>
                 )}
                 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -25,15 +25,21 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/lib/useAuth";
 import { useI18n } from "@/lib/i18n";
+import { useUserProfile, UserProfile } from "@/hooks/useUserProfile";
+import { doc, setDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { useToast } from "@/hooks/use-toast";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-interface UserProfile {
+// Local interface for edit form data (extends the UserProfile from hook)
+interface EditFormData {
   firstName: string;
   lastName: string;
   email: string;
   phone: string;
-  dateOfBirth: string;
-  address: string;
+  age: number;
   country: string;
+  address: string;
   bio: string;
   currentPassword: string;
   newPassword: string;
@@ -45,6 +51,8 @@ interface UserProfile {
 
 export default function EditProfile() {
   const { user } = useAuth();
+  const { userProfile, loading, error, getDisplayName, refetch } = useUserProfile();
+  const { toast } = useToast();
   const { t, language } = useI18n();
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -54,17 +62,16 @@ export default function EditProfile() {
     "personal"
   );
 
-  const [profile, setProfile] = useState<UserProfile>({
-    firstName: user?.firstName || (language === "ar" ? "أحمد" : "Ahmed"),
-    lastName: user?.lastName || (language === "ar" ? "محمد" : "Mohammed"),
-    email: user?.email || "student@example.com",
-    phone: "+966 50 123 4567",
-    dateOfBirth: "1995-01-15",
-    address: language === "ar" ? "الرياض، المملكة العربية السعودية" : "Riyadh, Saudi Arabia",
-    country: language === "ar" ? "المملكة العربية السعودية" : "Saudi Arabia",
-    bio: language === "ar" 
-      ? "طالب متحمس في أكاديمية التعلم الذكي، أسعى لتطوير مهاراتي في البرمجة وتطوير الويب."
-      : "Enthusiastic student at Smart Learning Academy, passionate about developing programming and web development skills.",
+  // Form data state - initialize with user profile data
+  const [formData, setFormData] = useState<EditFormData>({
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: "",
+    age: 18,
+    country: "",
+    address: "",
+    bio: "",
     currentPassword: "",
     newPassword: "",
     confirmPassword: "",
@@ -73,63 +80,149 @@ export default function EditProfile() {
     marketingEmails: false,
   });
 
+  // Update form data when user profile loads
+  useEffect(() => {
+    if (userProfile) {
+      setFormData({
+        firstName: userProfile.firstName || "",
+        lastName: userProfile.lastName || "",
+        email: userProfile.email || "",
+        phone: userProfile.phone || "",
+        age: userProfile.age || 18,
+        country: userProfile.country || "",
+        address: userProfile.address || "",
+        bio: userProfile.bio || "",
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+        emailNotifications: userProfile.emailNotifications,
+        courseNotifications: userProfile.courseNotifications,
+        marketingEmails: userProfile.marketingEmails,
+      });
+    }
+  }, [userProfile]);
+
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value, type, checked } = e.target as HTMLInputElement;
-    setProfile((p) => ({
-      ...p,
+    setFormData((prev) => ({
+      ...prev,
       [name]: type === "checkbox" ? checked : value,
     }));
   };
 
   const handleSave = async () => {
+    if (!user?.uid || !userProfile) {
+      toast({
+        title: "Error",
+        description: language === "ar" ? "فشل في تحميل بيانات المستخدم" : "Failed to load user data",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSaving(true);
 
     try {
-      // Simulate saving delay
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
       // Validate password change if attempting to change it
-      if (activeTab === "security" && profile.newPassword) {
-        if (profile.newPassword !== profile.confirmPassword) {
-          throw new Error(t("error.passwordMatch"));
+      if (activeTab === "security" && formData.newPassword) {
+        if (formData.newPassword !== formData.confirmPassword) {
+          throw new Error(language === "ar" ? "كلمة المرور غير متطابقة" : "Passwords do not match");
         }
-        if (!profile.currentPassword) {
-          throw new Error(t("error.required"));
+        if (!formData.currentPassword) {
+          throw new Error(language === "ar" ? "يرجى إدخال كلمة المرور الحالية" : "Current password is required");
         }
       }
 
-      // Save to localStorage (simulation)
-      const updatedUser = {
-        ...user,
-        firstName: profile.firstName,
-        lastName: profile.lastName,
-        email: profile.email,
-        displayName: `${profile.firstName} ${profile.lastName}`,
+      // Create updated user profile object
+      const updatedProfile: UserProfile = {
+        ...userProfile,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        phone: formData.phone,
+        age: Number(formData.age),
+        country: formData.country,
+        address: formData.address,
+        bio: formData.bio,
+        emailNotifications: formData.emailNotifications,
+        courseNotifications: formData.courseNotifications,
+        marketingEmails: formData.marketingEmails,
+        updatedAt: new Date().toISOString(),
       };
-      localStorage.setItem("defaultUser", JSON.stringify(updatedUser));
+
+      // Save to Firestore
+      await setDoc(doc(db, "users", user.uid), updatedProfile);
 
       // Clear password fields after successful save
       if (activeTab === "security") {
-        setProfile((p) => ({
-          ...p,
+        setFormData((prev) => ({
+          ...prev,
           currentPassword: "",
           newPassword: "",
           confirmPassword: "",
         }));
       }
 
+      // Refresh user profile data
+      await refetch();
+
       setIsEditing(false);
-      // In a real app, you would show a success toast here
-      alert(t("success.saved"));
+      
+      toast({
+        title: language === "ar" ? "تم الحفظ" : "Success",
+        description: language === "ar" ? "تم حفظ التغييرات بنجاح" : "Profile updated successfully",
+      });
     } catch (err: any) {
       console.error("Save failed", err);
-      alert(err.message || t("error.general"));
+      toast({
+        title: "Error",
+        description: err.message || (language === "ar" ? "فشل في حفظ التغييرات" : "Failed to save changes"),
+        variant: "destructive",
+      });
     } finally {
       setIsSaving(false);
     }
   };
+
+  // Show loading state while fetching user profile
+  if (loading) {
+    return (
+      <StudentLayout>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="text-center">
+            <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-muted-foreground">
+              {language === "ar" ? "جاري تحميل البيانات..." : "Loading profile..."}
+            </p>
+          </div>
+        </div>
+      </StudentLayout>
+    );
+  }
+
+  // Show error state if profile failed to load
+  if (error || !userProfile) {
+    return (
+      <StudentLayout>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="text-center">
+            <h2 className="text-xl font-semibold mb-2">
+              {language === "ar" ? "فشل في تحميل البيانات" : "Failed to Load Profile"}
+            </h2>
+            <p className="text-muted-foreground mb-4">
+              {language === "ar" ? "فشل في تحميل بيانات الملف الشخصي. يرجى المحاولة مرة أخرى." 
+                : "Failed to load profile data. Please try again."}
+            </p>
+            <Button onClick={() => refetch()}>
+              {language === "ar" ? "إعادة المحاولة" : "Try Again"}
+            </Button>
+          </div>
+        </div>
+      </StudentLayout>
+    );
+  }
 
   return (
     <StudentLayout>
@@ -187,11 +280,12 @@ export default function EditProfile() {
           <CardContent className="p-6">
             <div className="flex items-center space-x-6">
               <div className="relative">
-                <div className="w-24 h-24 bg-gradient-to-r from-primary to-purple-600 rounded-full flex items-center justify-center">
-                  <span className="text-white text-2xl font-bold">
-                    {profile.firstName.charAt(0)}{profile.lastName.charAt(0)}
-                  </span>
-                </div>
+                <Avatar className="w-24 h-24 border-4 border-primary/20">
+                  <AvatarImage src={userProfile?.avatar} alt={getDisplayName()} />
+                  <AvatarFallback className="bg-gradient-to-r from-primary to-purple-600 text-white text-2xl font-bold">
+                    {userProfile?.firstName.charAt(0)}{userProfile?.lastName.charAt(0)}
+                  </AvatarFallback>
+                </Avatar>
                 {isEditing && (
                   <button className="absolute -bottom-2 -right-2 w-8 h-8 bg-primary rounded-full flex items-center justify-center text-white hover:bg-primary/80 transition-colors">
                     <Camera className="w-4 h-4" />
@@ -200,9 +294,20 @@ export default function EditProfile() {
               </div>
               <div>
                 <h3 className="text-xl font-semibold text-foreground">
-                  {profile.firstName} {profile.lastName}
+                  {getDisplayName()}
                 </h3>
-                <p className="text-muted-foreground">{profile.email}</p>
+                <p className="text-muted-foreground">{userProfile?.email}</p>
+                <div className="flex items-center gap-2 mt-2">
+                  <Badge variant="outline">
+                    {language === "ar" 
+                      ? (userProfile?.accountType === 'student' ? 'طالب' : 'بالغ')
+                      : (userProfile?.accountType === 'student' ? 'Student' : 'Adult')
+                    }
+                  </Badge>
+                  <Badge variant="secondary">
+                    {language === "ar" ? `العمر: ${userProfile?.age}` : `Age: ${userProfile?.age}`}
+                  </Badge>
+                </div>
                 {isEditing && (
                   <Button variant="outline" size="sm" className="mt-2">
                     <Camera className="w-4 h-4 mr-2" />
@@ -248,7 +353,7 @@ export default function EditProfile() {
                     <Input
                       id="firstName"
                       name="firstName"
-                      value={profile.firstName}
+                      value={formData.firstName}
                       onChange={handleInputChange}
                       disabled={!isEditing}
                       className="bg-background border-border text-foreground disabled:bg-muted"
@@ -261,7 +366,7 @@ export default function EditProfile() {
                     <Input
                       id="lastName"
                       name="lastName"
-                      value={profile.lastName}
+                      value={formData.lastName}
                       onChange={handleInputChange}
                       disabled={!isEditing}
                       className="bg-background border-border text-foreground disabled:bg-muted"
@@ -280,7 +385,7 @@ export default function EditProfile() {
                       id="email"
                       name="email"
                       type="email"
-                      value={profile.email}
+                      value={formData.email}
                       onChange={handleInputChange}
                       disabled={!isEditing}
                       className="bg-background border-border text-foreground disabled:bg-muted"
@@ -294,7 +399,7 @@ export default function EditProfile() {
                     <Input
                       id="phone"
                       name="phone"
-                      value={profile.phone}
+                      value={formData.phone}
                       onChange={handleInputChange}
                       disabled={!isEditing}
                       className="bg-background border-border text-foreground disabled:bg-muted"
@@ -305,15 +410,17 @@ export default function EditProfile() {
                 {/* Personal Details */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="dateOfBirth" className="text-foreground">
+                    <Label htmlFor="age" className="text-foreground">
                       <Calendar className="w-4 h-4 inline mr-2" />
-                      {t("editProfile.dateOfBirth")}
+                      {language === "ar" ? "العمر" : "Age"}
                     </Label>
                     <Input
-                      id="dateOfBirth"
-                      name="dateOfBirth"
-                      type="date"
-                      value={profile.dateOfBirth}
+                      id="age"
+                      name="age"
+                      type="number"
+                      min="1"
+                      max="100"
+                      value={formData.age}
                       onChange={handleInputChange}
                       disabled={!isEditing}
                       className="bg-background border-border text-foreground disabled:bg-muted"
@@ -327,7 +434,7 @@ export default function EditProfile() {
                     <Input
                       id="country"
                       name="country"
-                      value={profile.country}
+                      value={formData.country}
                       onChange={handleInputChange}
                       disabled={!isEditing}
                       className="bg-background border-border text-foreground disabled:bg-muted"
@@ -344,7 +451,7 @@ export default function EditProfile() {
                   <Input
                     id="address"
                     name="address"
-                    value={profile.address}
+                    value={formData.address}
                     onChange={handleInputChange}
                     disabled={!isEditing}
                     className="bg-background border-border text-foreground disabled:bg-muted"
@@ -359,7 +466,7 @@ export default function EditProfile() {
                   <Textarea
                     id="bio"
                     name="bio"
-                    value={profile.bio}
+                    value={formData.bio}
                     onChange={handleInputChange}
                     disabled={!isEditing}
                     rows={4}
@@ -391,7 +498,7 @@ export default function EditProfile() {
                         id="currentPassword"
                         name="currentPassword"
                         type={showCurrentPassword ? "text" : "password"}
-                        value={profile.currentPassword}
+                        value={formData.currentPassword}
                         onChange={handleInputChange}
                         disabled={!isEditing}
                         className="bg-background border-border text-foreground disabled:bg-muted pr-10"
@@ -417,7 +524,7 @@ export default function EditProfile() {
                         id="newPassword"
                         name="newPassword"
                         type={showNewPassword ? "text" : "password"}
-                        value={profile.newPassword}
+                        value={formData.newPassword}
                         onChange={handleInputChange}
                         disabled={!isEditing}
                         className="bg-background border-border text-foreground disabled:bg-muted pr-10"
@@ -442,7 +549,7 @@ export default function EditProfile() {
                       id="confirmPassword"
                       name="confirmPassword"
                       type="password"
-                      value={profile.confirmPassword}
+                      value={formData.confirmPassword}
                       onChange={handleInputChange}
                       disabled={!isEditing}
                       className="bg-background border-border text-foreground disabled:bg-muted"
@@ -475,7 +582,7 @@ export default function EditProfile() {
                     <input
                       type="checkbox"
                       name="emailNotifications"
-                      checked={profile.emailNotifications}
+                      checked={formData.emailNotifications}
                       onChange={handleInputChange}
                       disabled={!isEditing}
                       className="h-4 w-4 rounded border-border text-primary focus:ring-primary disabled:opacity-50"
@@ -492,7 +599,7 @@ export default function EditProfile() {
                     <input
                       type="checkbox"
                       name="courseNotifications"
-                      checked={profile.courseNotifications}
+                      checked={formData.courseNotifications}
                       onChange={handleInputChange}
                       disabled={!isEditing}
                       className="h-4 w-4 rounded border-border text-primary focus:ring-primary disabled:opacity-50"
@@ -509,7 +616,7 @@ export default function EditProfile() {
                     <input
                       type="checkbox"
                       name="marketingEmails"
-                      checked={profile.marketingEmails}
+                      checked={formData.marketingEmails}
                       onChange={handleInputChange}
                       disabled={!isEditing}
                       className="h-4 w-4 rounded border-border text-primary focus:ring-primary disabled:opacity-50"

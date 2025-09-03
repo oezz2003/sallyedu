@@ -1,0 +1,67 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+        (request.auth.token.role in ['admin', 'editor'] || 
+         request.auth.token.admin == true);
+    }
+    
+    function isSelf(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function hasRole(role) {
+      return isAuthenticated() && request.auth.token.role == role;
+    }
+
+    // Users collection
+    match /users/{userId} {
+      // Admins can read all users, users can read their own profile
+      allow read: if isAdmin() || isSelf(userId);
+      
+      // Only admins can create users (handled by Admin SDK)
+      allow create: if false;
+      
+      // Only admins can update role/accountType/isActive or other privileged fields
+      allow update: if isAdmin() || 
+        (isSelf(userId) && 
+         !('role' in request.resource.data) &&
+         !('accountType' in request.resource.data) &&
+         !('isActive' in request.resource.data));
+      
+      // Only admins can delete users (handled by Admin SDK)
+      allow delete: if false;
+    }
+
+    // Courses collection
+    match /courses/{courseId} {
+      allow read: if true; // Public read access
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Enrollments collection
+    match /enrollments/{enrollmentId} {
+      allow read: if isAdmin() || 
+        isSelf(resource.data.userId);
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Payments collection
+    match /payments/{paymentId} {
+      allow read: if isAdmin() || 
+        isSelf(resource.data.userId);
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Test collection (for connection testing)
+    match /test/{docId} {
+      allow read, write: if isAuthenticated();
+    }
+  }
+}

@@ -1,0 +1,83 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // DEVELOPMENT RULES - LESS RESTRICTIVE FOR TESTING
+    // Use firestore.rules for production deployment
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // USERS Collection - Allow authenticated users to read all, write own
+    match /users/{userId} {
+      // Authenticated users can read all user documents (for admin dashboard testing)
+      allow read: if isAuthenticated();
+      
+      // Users can write their own document
+      allow write: if isAuthenticated() && request.auth.uid == userId;
+      
+      // Allow admin operations for testing (any authenticated user can act as admin)
+      allow create, update, delete: if isAuthenticated();
+    }
+    
+    // COURSES Collection - Authenticated read/write for testing
+    match /courses/{courseId} {
+      allow read, write: if isAuthenticated();
+    }
+    
+    // ENROLLMENTS Collection - Authenticated access
+    match /enrollments/{enrollmentId} {
+      allow read, write: if isAuthenticated();
+    }
+    
+    // PAYMENTS Collection - Authenticated access  
+    match /payments/{paymentId} {
+      allow read, write: if isAuthenticated();
+    }
+    
+    // CERTIFICATES Collection - Authenticated access
+    match /certificates/{certificateId} {
+      allow read, write: if isAuthenticated();
+    }
+    
+    // ANALYTICS Collection - Authenticated read for dashboard testing
+    match /analytics/{document=**} {
+      allow read: if isAuthenticated();
+      allow write: if false; // Keep write disabled for safety
+    }
+    
+    // SETTINGS Collection - Public read, authenticated write
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+    
+    // NOTIFICATIONS Collection - Authenticated access
+    match /notifications/{notificationId} {
+      allow read, write: if isAuthenticated();
+    }
+    
+    // SUPPORT Collection - Authenticated access
+    match /support/{ticketId} {
+      allow read, write: if isAuthenticated();
+    }
+    
+    // LOGS Collection - Authenticated read only
+    match /logs/{document=**} {
+      allow read: if isAuthenticated();
+      allow write: if false;
+    }
+    
+    // Allow public read for published courses (no auth required)
+    match /courses/{courseId} {
+      allow read: if resource.data.status == 'published';
+    }
+    
+    // Default authenticated access for any other collections
+    match /{document=**} {
+      allow read, write: if isAuthenticated();
+    }
+  }
+}

@@ -1,11 +1,14 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useI18n } from "@/lib/i18n";
 import { Lock, Mail } from "lucide-react";
 import { Navigation } from "@/components/Navigation";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { auth } from "@/lib/firebase";
+import { useToast } from "@/hooks/use-toast";
 
 export function LoginPage() {
   const { t, language } = useI18n();
@@ -13,29 +16,52 @@ export function LoginPage() {
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
+  const { toast } = useToast();
 
-  function login(e: React.FormEvent) {
+  async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
+    
+    if (!email || !password) {
+      toast({
+        title: t("login.error"),
+        description: language === "ar" ? "يرجى إدخال البريد الإلكتروني وكلمة المرور" : "Please enter email and password",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     
-    // Simulate loading
-    setTimeout(() => {
-      // Set default user data in localStorage
-      const defaultUser = {
-        uid: "default-user-123",
-        email: email || "student@example.com",
-        displayName: language === "ar" ? "أحمد محمد" : "Ahmed Mohammed",
-        firstName: language === "ar" ? "أحمد" : "Ahmed",
-        lastName: language === "ar" ? "محمد" : "Mohammed",
-        isDefaultUser: true
-      };
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
       
-      localStorage.setItem("defaultUser", JSON.stringify(defaultUser));
-      localStorage.setItem("isLoggedIn", "true");
+      toast({
+        title: t("login.success"),
+        description: language === "ar" ? "تم تسجيل الدخول بنجاح" : "Login successful",
+      });
       
-      setIsSubmitting(false);
       navigate("/student-dashboard", { replace: true });
-    }, 1000);
+    } catch (error: any) {
+      console.error("Login error:", error);
+      
+      let errorMessage = language === "ar" ? "فشل في تسجيل الدخول" : "Login failed";
+      
+      if (error.code === "auth/user-not-found" || error.code === "auth/invalid-credential") {
+        errorMessage = language === "ar" ? "البريد الإلكتروني أو كلمة المرور غير صحيحة" : "Invalid email or password";
+      } else if (error.code === "auth/invalid-email") {
+        errorMessage = language === "ar" ? "البريد الإلكتروني غير صحيح" : "Invalid email address";
+      } else if (error.code === "auth/too-many-requests") {
+        errorMessage = language === "ar" ? "عدد كبير من المحاولات. حاول مرة أخرى لاحقاً" : "Too many attempts. Try again later";
+      }
+      
+      toast({
+        title: t("login.error"),
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -69,7 +95,7 @@ export function LoginPage() {
               </p>
             </div>
 
-            <form className="space-y-4" onSubmit={login}>
+            <form className="space-y-4" onSubmit={handleLogin}>
               <div className="space-y-2">
                 <Label htmlFor="email" className="text-foreground">
                   {language === "ar" ? "البريد الإلكتروني" : "Email"}
@@ -118,6 +144,21 @@ export function LoginPage() {
                   ? "يمكنك إدخال أي بيانات للدخول إلى الداشبورد" 
                   : "You can enter any credentials to access the dashboard"
                 }
+              </p>
+            </div>
+
+            <div className="text-center border-t border-border pt-4">
+              <p className="text-sm text-muted-foreground">
+                {language === "ar" 
+                  ? "ليس لديك حساب؟" 
+                  : "Don't have an account?"
+                }{" "}
+                <Link 
+                  to="/SignUp" 
+                  className="font-medium text-primary hover:text-primary/80 underline underline-offset-4"
+                >
+                  {language === "ar" ? "إنشاء حساب جديد" : "Create an account"}
+                </Link>
               </p>
             </div>
           </div>

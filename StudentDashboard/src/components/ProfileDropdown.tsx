@@ -11,6 +11,8 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/lib/useAuth";
 import { useI18n } from "@/lib/i18n";
+import { useUserProfile } from "@/hooks/useUserProfile";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface ProfileDropdownProps {
   onCustomerServiceClick: () => void;
@@ -22,21 +24,10 @@ export default function ProfileDropdown({
   onLogout,
 }: ProfileDropdownProps) {
   const { user } = useAuth();
+  const { userProfile, loading, getDisplayName } = useUserProfile();
   const { t, language } = useI18n();
   const [isOpen, setIsOpen] = useState(false);
-  const [profile, setProfile] = useState<{ firstName: string; lastName: string; email: string } | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
-
-  // Load profile from localStorage when user is available
-  useEffect(() => {
-    if (user) {
-      setProfile({
-        firstName: user.firstName || (language === "ar" ? "أحمد" : "Ahmed"),
-        lastName: user.lastName || (language === "ar" ? "محمد" : "Mohammed"),
-        email: user.email || "student@example.com",
-      });
-    }
-  }, [user, language]);
 
   // Close on outside click
   useEffect(() => {
@@ -49,17 +40,26 @@ export default function ProfileDropdown({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const initials = profile
-    ? `${profile.firstName.charAt(0)}${profile.lastName.charAt(0)}`
-    : (language === "ar" ? "أم" : "AM");
+  // Get user display info
+  const displayName = userProfile ? getDisplayName() : (user?.displayName || user?.email || "User");
+  const displayEmail = userProfile?.email || user?.email || "user@example.com";
+  
+  const initials = userProfile
+    ? `${userProfile.firstName.charAt(0)}${userProfile.lastName.charAt(0)}`
+    : displayName.split(' ').map(n => n.charAt(0)).join('').slice(0, 2).toUpperCase() || (language === "ar" ? "أم" : "US");
 
   return (
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(o => !o)}
-        className="w-8 h-8 bg-gradient-to-r from-primary to-purple-600 rounded-full flex items-center justify-center hover:shadow-lg transition-all duration-200 group"
+        className="flex items-center justify-center hover:shadow-lg transition-all duration-200 group"
       >
-        <span className="text-white text-sm font-medium">{initials}</span>
+        <Avatar className="w-8 h-8 border-2 border-primary/20 hover:border-primary/40 transition-colors">
+          <AvatarImage src={userProfile?.avatar} alt={displayName} />
+          <AvatarFallback className="bg-gradient-to-r from-primary to-purple-600 text-white text-sm font-medium">
+            {initials}
+          </AvatarFallback>
+        </Avatar>
       </button>
 
       {isOpen && (
@@ -68,14 +68,25 @@ export default function ProfileDropdown({
             {/* Header */}
             <div className="p-4 border-b border-border bg-muted/50">
               <div className="flex items-center space-x-3">
-                <div className="w-12 h-12 bg-gradient-to-r from-primary to-purple-600 rounded-full flex items-center justify-center">
-                  <span className="text-white font-medium">{initials}</span>
-                </div>
-                <div>
-                  <h4 className="font-semibold text-foreground">
-                    {profile?.firstName} {profile?.lastName}
+                <Avatar className="w-12 h-12 border-2 border-primary/20">
+                  <AvatarImage src={userProfile?.avatar} alt={displayName} />
+                  <AvatarFallback className="bg-gradient-to-r from-primary to-purple-600 text-white font-medium">
+                    {initials}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-semibold text-foreground truncate">
+                    {displayName}
                   </h4>
-                  <p className="text-sm text-muted-foreground">{profile?.email}</p>
+                  <p className="text-sm text-muted-foreground truncate">{displayEmail}</p>
+                  {userProfile && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {language === "ar" 
+                        ? (userProfile.accountType === 'student' ? 'طالب' : 'بالغ')
+                        : (userProfile.accountType === 'student' ? 'Student' : 'Adult')
+                      } • {language === "ar" ? `العمر ${userProfile.age}` : `Age ${userProfile.age}`}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>

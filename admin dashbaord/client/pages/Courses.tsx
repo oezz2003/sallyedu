@@ -1,802 +1,889 @@
-import { useNavigate } from 'react-router-dom';
-import React, { useState, useRef } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import AddCourseDialog from '../components/AddCourseDialog';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { collection, addDoc, getDocs, setDoc, doc} from "firebase/firestore";
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import Footer from "@/components/ui/footer";
-
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { 
-  Plus, 
-  Search, 
-  Edit,
-  Trash2,
-  Users,
-  Star,
-  Clock,
-  DollarSign,
-  BookOpen,
-  MoreHorizontal,
-  Video,
-  Upload,
-  Image as ImageIcon,
-  Play,
-  Save
-} from 'lucide-react';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { db } from '@/lib/firebase';
-import { CourseWithVideos, VideoContent, coursesWithContent } from '@/lib/coursesData';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Plus, Edit, Trash2, Eye, Play, Users, DollarSign, Clock, Search, Filter, PlusCircle, GraduationCap } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { Course, VideoContent } from '@/lib/firebaseService';
+import initializeAdmin from '@/lib/firebaseAdmin';
 
-async function addCourse(course: Course) {
-  try {
-    const docRef = await addDoc(collection(db, "courses"), course);
-    console.log("Document written with ID:", docRef.id);
-  } catch (e) {
-    console.error("Error adding document:", e);
-  }
+interface CourseFormData {
+  title: string;
+  description: string;
+  instructors: string[];
+  category: string;
+  price: number;
+  duration: string;
+  thumbnail: string;
+  status: 'draft' | 'published' | 'archived';
+  videos: VideoContent[];
 }
 
-async function getCourses(): Promise<Course[]> {
-  try {
-    const querySnapshot = await getDocs(collection(db, "courses"));
-    const courses: Course[] = querySnapshot.docs.map(doc => doc.data() as Course);
-    console.log("Fetched courses:", courses);
-    return courses;
-  } catch (e) {
-    console.error("Error fetching courses:", e);
-    return [];
-  }
-}
+const initialFormData: CourseFormData = {
+  title: '',
+  description: '',
+  instructors: [],
+  category: '',
+  price: 0,
+  duration: '',
+  thumbnail: '',
+  status: 'draft',
+  videos: []
+};
 
-
-// Use shared types and data for consistency
-type Course = Omit<CourseWithVideos, 'id' | 'instructor'> & { id: string; instructors: string[] };
-const initialCourses: Course[] = coursesWithContent.map(c => ({
-  ...c,
-  id: c.id.toString(),
-  instructors: c.instructor ? [c.instructor] : [],
-}));
-
-
-const categories = ["Programming", "Data Science", "AI/ML", "Design", "Business", "Marketing"];
+const categories = [
+  'Programming', 'Data Science', 'Design', 'Business', 'Marketing', 
+  'Language', 'Music', 'Photography', 'Fitness', 'Cooking'
+];
 
 export default function Courses() {
-  const navigate = useNavigate();
-  const [courses, setCourses] = useState<Course[]>(initialCourses);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [categoryFilter, setCategoryFilter] = useState("all");
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [operationLoading, setOperationLoading] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [isEditContentDialogOpen, setIsEditContentDialogOpen] = useState(false);
-  const [selectedCourseForContent, setSelectedCourseForContent] = useState<Course | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [formData, setFormData] = useState<CourseFormData>(initialFormData);
+  const [instructorInput, setInstructorInput] = useState('');
+  const [videoInput, setVideoInput] = useState({ title: '', description: '', url: '', duration: '' });
+  const { toast } = useToast();
 
-  // Form state
-  const [formData, setFormData] = useState({
-    title: "",
-    description: "",
-    instructors: [""],
-    category: "",
-    price: "",
-    duration: "",
-    status: "draft" as Course['status'],
-    thumbnail: "/placeholder.svg",
-    videos: [] as VideoContent[]
-  });
-
-  // Content editing state
-  const [contentFormData, setContentFormData] = useState({
-    title: "",
-    description: "",
-    videos: [] as VideoContent[]
-  });
-
-  const filteredCourses = courses.filter(course => {
-    const matchesSearch = course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         course.instructors.some(i => i.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesStatus = statusFilter === "all" || course.status === statusFilter;
-    const matchesCategory = categoryFilter === "all" || course.category === categoryFilter;
-    
-    return matchesSearch && matchesStatus && matchesCategory;
-  });
-
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      // In a real application, you would upload the file to a server
-      // For now, we'll create a fake URL
-      const fakeUrl = URL.createObjectURL(file);
-      setFormData({ ...formData, thumbnail: fakeUrl });
+  // Fetch courses directly using Client SDK wrapper
+  const fetchCourses = async () => {
+    try {
+      setLoading(true);
+      
+      // Initialize Client SDK wrapper
+      const admin = initializeAdmin();
+      
+      // Fetch courses from Firestore using Client SDK
+      const coursesSnapshot = await admin.queryWithOrder('courses', 'createdAt', 'desc');
+      
+      const fetchedCourses: Course[] = [];
+      coursesSnapshot.forEach((doc) => {
+        const data = doc.data();
+        fetchedCourses.push({
+          id: doc.id,
+          title: data.title || '',
+          description: data.description || '',
+          instructors: data.instructors || [],
+          category: data.category || '',
+          price: data.price || 0,
+          duration: data.duration || '',
+          thumbnail: data.thumbnail || '',
+          status: data.status || 'draft',
+          students: data.students || 0,
+          rating: data.rating || 0,
+          progress: data.progress || 0,
+          videos: data.videos || [],
+          prerequisites: data.prerequisites || [],
+          learningObjectives: data.learningObjectives || [],
+          createdAt: data.createdAt || new Date().toISOString(),
+          updatedAt: data.updatedAt || new Date().toISOString(),
+          createdBy: data.createdBy || ''
+        });
+      });
+      
+      setCourses(fetchedCourses);
+    } catch (error) {
+      console.error('Error fetching courses:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch courses from database",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
-  const addVideo = (e?: React.MouseEvent) => {
-    e?.preventDefault();
-    e?.stopPropagation();
-    const newVideo: VideoContent = {
-      id: Date.now(),
-      title: "",
-      description: "",
-      url: "",
-      duration: "",
-      order: formData.videos.length + 1
-    };
-    setFormData({ ...formData, videos: [...formData.videos, newVideo] });
+  useEffect(() => {
+    fetchCourses();
+  }, []);
+
+  const handleCreateCourse = async () => {
+    try {
+      setOperationLoading('create');
+      
+      // Initialize Client SDK wrapper
+      const admin = initializeAdmin();
+      
+      // Create course data
+      const courseData = {
+        ...formData,
+        students: 0,
+        rating: 0,
+        progress: 0,
+        prerequisites: [],
+        learningObjectives: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        createdBy: 'admin' // You can get this from auth context
+      };
+      
+      // Add course to Firestore
+      await admin.addDocument('courses', courseData);
+      
+      toast({
+        title: "Success",
+        description: "Course created successfully"
+      });
+      
+      setDialogOpen(false);
+      setFormData(initialFormData);
+      fetchCourses();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create course",
+        variant: "destructive"
+      });
+    } finally {
+      setOperationLoading(null);
+    }
   };
 
-  const removeVideo = (videoId: number, e?: React.MouseEvent) => {
-    e?.preventDefault();
-    e?.stopPropagation();
-    setFormData({
-      ...formData,
-      videos: formData.videos.filter(video => video.id !== videoId)
-    });
+  const handleUpdateCourse = async () => {
+    if (!editingCourse?.id) return;
+    
+    try {
+      setOperationLoading('update');
+      
+      // Initialize Client SDK wrapper
+      const admin = initializeAdmin();
+      
+      // Update course data
+      const updateData = {
+        ...formData,
+        updatedAt: new Date().toISOString()
+      };
+      
+      // Update course in Firestore
+      await admin.updateDocument('courses', editingCourse.id, updateData);
+      
+      toast({
+        title: "Success",
+        description: "Course updated successfully"
+      });
+      
+      setDialogOpen(false);
+      setEditingCourse(null);
+      setFormData(initialFormData);
+      fetchCourses();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update course",
+        variant: "destructive"
+      });
+    } finally {
+      setOperationLoading(null);
+    }
   };
 
-  const updateVideo = (videoId: number, field: keyof VideoContent, value: string) => {
-    setFormData({
-      ...formData,
-      videos: formData.videos.map(video =>
-        video.id === videoId ? { ...video, [field]: value } : video
-      )
-    });
+  const handleDeleteCourse = async (courseId: string) => {
+    try {
+      setOperationLoading(`delete-${courseId}`);
+      
+      // Initialize Client SDK wrapper
+      const admin = initializeAdmin();
+      
+      // Delete course from Firestore
+      await admin.deleteDocument('courses', courseId);
+      
+      toast({
+        title: "Success",
+        description: "Course deleted successfully"
+      });
+      
+      fetchCourses();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete course",
+        variant: "destructive"
+      });
+    } finally {
+      setOperationLoading(null);
+    }
   };
 
-  const addContentVideo = (e?: React.MouseEvent) => {
-    e?.preventDefault();
-    e?.stopPropagation();
-    const newVideo: VideoContent = {
-      id: Date.now(),
-      title: "",
-      description: "",
-      url: "",
-      duration: "",
-      order: contentFormData.videos.length + 1
-    };
-    setContentFormData({ ...contentFormData, videos: [...contentFormData.videos, newVideo] });
-  };
-
-  const removeContentVideo = (videoId: number, e?: React.MouseEvent) => {
-    e?.preventDefault();
-    e?.stopPropagation();
-    setContentFormData({
-      ...contentFormData,
-      videos: contentFormData.videos.filter(video => video.id !== videoId)
-    });
-  };
-
-  const updateContentVideo = (videoId: number, field: keyof VideoContent, value: string) => {
-    setContentFormData({
-      ...contentFormData,
-      videos: contentFormData.videos.map(video =>
-        video.id === videoId ? { ...video, [field]: value } : video
-      )
-    });
-  };
-
-const handleAddCourse = async () => {
-  try {
-    // Step 1: Create a reference for a new doc (this generates the ID)
-    const newDocRef = doc(collection(db, "courses"));
-
-    // Step 2: Prepare your course object with Firestore ID as 'id'
-    const newCourse: Course = {
-      id: newDocRef.id, // Firestore's generated ID
-      title: formData.title,
-      description: formData.description,
-  instructors: formData.instructors.filter(i => i.trim() !== ""),
-      category: formData.category,
-      price: Number(formData.price),
-      duration: formData.duration,
-      students: 0,
-      rating: 0,
-      status: formData.status,
-      thumbnail: formData.thumbnail,
-      createdAt: new Date().toISOString().split("T")[0],
-      videos: formData.videos,
-      progress: 0
-    };
-
-    // Step 3: Save the document to Firestore
-    await setDoc(newDocRef, newCourse);
-
-    // Step 4: Update local state
-    setCourses([...courses, newCourse]);
-
-    // Step 5: Close dialog & reset form
-    setIsAddDialogOpen(false);
-    resetForm();
-
-    console.log("Course added with Firestore ID:", newDocRef.id);
-  } catch (error) {
-    console.error("Error adding course:", error);
-  }
-};
-
-  const handleEditCourse = () => {
-    if (!editingCourse) return;
-
-    const updatedCourses = courses.map(course =>
-      course.id === editingCourse.id
-        ? {
-            ...course,
-            title: formData.title,
-            description: formData.description,
-            instructors: formData.instructors.filter(i => i.trim() !== ""),
-            category: formData.category,
-            price: Number(formData.price),
-            duration: formData.duration,
-            status: formData.status,
-            thumbnail: formData.thumbnail
-          }
-        : course
-    );
-
-    setCourses(updatedCourses);
-    setIsEditDialogOpen(false);
-    setEditingCourse(null);
-    resetForm();
-  };
-
-  const handleEditContent = () => {
-    if (!selectedCourseForContent) return;
-
-    const updatedCourses = courses.map(course =>
-      course.id === selectedCourseForContent.id
-        ? {
-            ...course,
-            title: contentFormData.title,
-            description: contentFormData.description,
-            videos: contentFormData.videos
-          }
-        : course
-    );
-
-    setCourses(updatedCourses);
-    setIsEditContentDialogOpen(false);
-    setSelectedCourseForContent(null);
-  };
-
-  const handleDeleteCourse = (courseId: string) => {
-    setCourses(courses.filter(course => course.id !== courseId));
+  const handleStatusChange = async (courseId: string, newStatus: 'draft' | 'published' | 'archived') => {
+    try {
+      setOperationLoading(`status-${courseId}`);
+      
+      // Initialize Client SDK wrapper
+      const admin = initializeAdmin();
+      
+      // Update course status in Firestore
+      await admin.updateDocument('courses', courseId, {
+        status: newStatus,
+        updatedAt: new Date().toISOString()
+      });
+      
+      toast({
+        title: "Success",
+        description: "Course status updated successfully"
+      });
+      
+      fetchCourses();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update course status",
+        variant: "destructive"
+      });
+    } finally {
+      setOperationLoading(null);
+    }
   };
 
   const openEditDialog = (course: Course) => {
     setEditingCourse(course);
+    
+    // Handle price conversion from object to number if needed
+    let coursePrice = 0;
+    if (course.price && typeof course.price === 'object' && 'amount' in (course.price as any)) {
+      coursePrice = ((course.price as any).amount ?? 0) / 100;
+    } else {
+      coursePrice = course.price ?? 0;
+    }
+    
     setFormData({
       title: course.title,
       description: course.description,
-  instructors: course.instructors,
+      instructors: course.instructors,
       category: course.category,
-      price: course.price.toString(),
+      price: coursePrice,
       duration: course.duration,
-      status: course.status,
       thumbnail: course.thumbnail,
+      status: course.status,
       videos: course.videos
     });
-    setIsEditDialogOpen(true);
+    setDialogOpen(true);
   };
 
-  const openEditContentDialog = (course: Course) => {
-    setSelectedCourseForContent(course);
-    setContentFormData({
-      title: course.title,
-      description: course.description,
-      videos: [...course.videos]
-    });
-    setIsEditContentDialogOpen(true);
+  const openCreateDialog = () => {
+    setEditingCourse(null);
+    setFormData(initialFormData);
+    setDialogOpen(true);
   };
 
-  const resetForm = () => {
-    setFormData({
-      title: "",
-      description: "",
-  instructors: [""],
-      category: "",
-      price: "",
-      duration: "",
-      status: "draft",
-      thumbnail: "/placeholder.svg",
-      videos: []
-    });
+  const addInstructor = () => {
+    if (instructorInput.trim() && !formData.instructors.includes(instructorInput.trim())) {
+      setFormData(prev => ({
+        ...prev,
+        instructors: [...prev.instructors, instructorInput.trim()]
+      }));
+      setInstructorInput('');
+    }
   };
+
+  const removeInstructor = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      instructors: prev.instructors.filter((_, i) => i !== index)
+    }));
+  };
+
+  const addVideo = () => {
+    if (videoInput.title && videoInput.url) {
+      const newVideo: VideoContent = {
+        id: formData.videos.length + 1,
+        title: videoInput.title,
+        description: videoInput.description,
+        url: videoInput.url,
+        duration: videoInput.duration || '0m',
+        order: formData.videos.length + 1
+      };
+      setFormData(prev => ({
+        ...prev,
+        videos: [...prev.videos, newVideo]
+      }));
+      setVideoInput({ title: '', description: '', url: '', duration: '' });
+    }
+  };
+
+  const removeVideo = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      videos: prev.videos.filter((_, i) => i !== index)
+    }));
+  };
+
+  const filteredCourses = courses.filter(course => {
+    const matchesSearch = course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         course.description.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter === 'all' || course.status === statusFilter;
+    const matchesCategory = categoryFilter === 'all' || course.category === categoryFilter;
+    return matchesSearch && matchesStatus && matchesCategory;
+  });
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'published': return 'bg-green-100 text-green-800';
+      case 'draft': return 'bg-yellow-100 text-yellow-800';
+      case 'archived': return 'bg-gray-100 text-gray-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading courses...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
+    <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Courses</h1>
-          <p className="text-muted-foreground">Manage your educational content and course offerings</p>
+          <h1 className="text-3xl font-bold text-gray-900">Courses Management</h1>
+          <p className="text-gray-600 mt-2">Manage all courses, content, and student enrollments</p>
         </div>
-
-        <AddCourseDialog
-          open={isAddDialogOpen}
-          setOpen={setIsAddDialogOpen}
-          categories={categories}
-          onAddCourse={(newCourse) => {
-            setCourses([
-              ...courses,
-              {
-                ...newCourse,
-                id: Date.now().toString(),
-                instructors: newCourse.instructors.filter((i) => i.trim() !== ""),
-                videos: newCourse.videos.map((v, idx) => ({ ...v, order: idx + 1, id: v.id || Date.now() + idx })),
-                students: 0,
-                rating: 0,
-                status: newCourse.status,
-                progress: 0,
-                thumbnail: newCourse.thumbnail,
-              },
-            ]);
-          }}
-        />
+        <div className="flex items-center space-x-3">
+          <Button 
+            variant="outline" 
+            onClick={fetchCourses}
+            disabled={loading}
+            className="flex items-center space-x-2"
+          >
+            <div className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`}>
+              {loading ? (
+                <div className="w-4 h-4 border-2 border-gray-300 border-t-blue-600 rounded-full" />
+              ) : (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              )}
+            </div>
+            <span>{loading ? 'Refreshing...' : 'Refresh'}</span>
+          </Button>
+          <Button onClick={openCreateDialog} className="bg-blue-600 hover:bg-blue-700">
+            <Plus className="w-4 h-4 mr-2" />
+            Add New Course
+          </Button>
+        </div>
       </div>
 
-      {/* Filters */}
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Courses</CardTitle>
+            <GraduationCap className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{courses.length}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Published</CardTitle>
+            <Eye className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{courses.filter(c => c.status === 'published').length}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Students</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{courses.reduce((sum, c) => sum + c.students, 0)}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">${courses.reduce((sum, c) => {
+             let coursePrice = 0;
+             if (c.price && typeof c.price === 'object' && 'amount' in (c.price as any)) {
+               coursePrice = ((c.price as any).amount ?? 0) / 100;
+             } else {
+               coursePrice = c.price ?? 0;
+             }
+             return sum + (coursePrice * c.students);
+           }, 0).toLocaleString()}</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Filters and Search */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Filters</CardTitle>
+          <CardTitle>Filters & Search</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="search">Search</Label>
               <div className="relative">
-                <Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
+                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <Input
-                  placeholder="Search courses or instructors..."
+                  id="search"
+                  placeholder="Search courses..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
                 />
               </div>
             </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-40">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="draft">Draft</SelectItem>
-                <SelectItem value="archived">Archived</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-40">
-                <SelectValue placeholder="Category" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                {categories.map((category) => (
-                  <SelectItem key={category} value={category}>{category}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Courses Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredCourses.map((course) => (
-          <Card key={course.id} className="overflow-hidden">
-            <div className="aspect-video bg-muted relative">
-              <img 
-                src={course.thumbnail} 
-                alt={course.title}
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute top-2 right-2">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="bg-white/90 hover:bg-white">
-                      <MoreHorizontal className="w-4 h-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => openEditDialog(course)}>
-                      <Edit className="w-4 h-4 mr-2" />
-                      Edit Course
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => openEditContentDialog(course)}>
-                      <Video className="w-4 h-4 mr-2" />
-                      Edit Content
-                    </DropdownMenuItem>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                          <Trash2 className="w-4 h-4 mr-2" />
-                          Delete Course
-                        </DropdownMenuItem>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Delete Course</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Are you sure you want to delete "{course.title}"? This action cannot be undone.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => handleDeleteCourse(course.id)}>
-                            Delete
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-              {course.videos.length > 0 && (
-                <div className="absolute bottom-2 left-2 bg-black/70 text-white px-2 py-1 rounded text-xs flex items-center">
-                  <Play className="w-3 h-3 mr-1" />
-                  {course.videos.length} videos
-                </div>
-              )}
-            </div>
-            
-            <CardHeader>
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <CardTitle className="text-lg line-clamp-2">{course.title}</CardTitle>
-                  <CardDescription className="mt-1">
-                    By {course.instructors && course.instructors.length > 0 ? course.instructors.join(", ") : "N/A"}
-                  </CardDescription>
-                </div>
-                <Badge variant={course.status === "active" ? "default" : course.status === "draft" ? "secondary" : "outline"}>
-                  {course.status}
-                </Badge>
-              </div>
-            </CardHeader>
-            
-            <CardContent>
-              <p className="text-sm text-muted-foreground line-clamp-2 mb-4">
-                {course.description}
-              </p>
-              
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <div className="flex items-center space-x-4">
-                    <div className="flex items-center text-muted-foreground">
-                      <Users className="w-3 h-3 mr-1" />
-                      {course.students}
-                    </div>
-                    <div className="flex items-center text-muted-foreground">
-                      <Star className="w-3 h-3 mr-1 text-yellow-500 fill-current" />
-                      {course.rating || "New"}
-                    </div>
-                    <div className="flex items-center text-muted-foreground">
-                      <Clock className="w-3 h-3 mr-1" />
-                      {course.duration}
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="flex items-center justify-between pt-2 border-t">
-                  <div className="flex items-center text-sm font-medium">
-                    <DollarSign className="w-3 h-3 mr-1" />
-                    {course.price}
-                  </div>
-                  <Badge variant="outline" className="text-xs">
-                    {course.category}
-                  </Badge>
-                </div>
-              </div>
-            </CardContent>
-            <div className="p-4 pt-0 flex justify-end">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => navigate(`/course/${course.id}`, { state: { course } })}
-              >
-                View Full Info
-              </Button>
-            </div>
-          </Card>
-        ))}
-      </div>
-
-      {filteredCourses.length === 0 && (
-        <Card>
-          <CardContent className="py-16">
-            <div className="text-center space-y-4">
-              <BookOpen className="w-12 h-12 mx-auto text-muted-foreground" />
-              <div>
-                <h3 className="text-lg font-medium">No courses found</h3>
-                <p className="text-muted-foreground">Try adjusting your search filters or add a new course.</p>
-              </div>
-              <Button onClick={() => setIsAddDialogOpen(true)}>
-                <Plus className="w-4 h-4 mr-2" />
-                Add Your First Course
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Edit Course Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Edit Course</DialogTitle>
-            <DialogDescription>
-              Update the course information below
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            {/* Course Image Upload */}
-            <div className="space-y-4">
-              <Label className="text-base font-medium">Course Cover Image</Label>
-              <div className="flex items-center space-x-4">
-                <div className="w-32 h-20 border border-border rounded-lg overflow-hidden bg-muted">
-                  <img 
-                    src={formData.thumbnail} 
-                    alt="Course cover" 
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    <Upload className="w-4 h-4 mr-2" />
-                    Change Image
-                  </Button>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Recommended size: 1920x1080px
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="edit-title">Course Title</Label>
-                <Input
-                  id="edit-title"
-                  value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  placeholder="Enter course title"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Instructors</Label>
-                {formData.instructors.map((inst, idx) => (
-                  <div key={idx} className="flex gap-2 mb-2">
-                    <Input
-                      value={inst}
-                      onChange={e => {
-                        const newInstructors = [...formData.instructors];
-                        newInstructors[idx] = e.target.value;
-                        setFormData({ ...formData, instructors: newInstructors });
-                      }}
-                      placeholder={`Instructor ${idx + 1}`}
-                    />
-                    {formData.instructors.length > 1 && (
-                      <Button type="button" size="icon" variant="ghost" onClick={() => {
-                        setFormData({
-                          ...formData,
-                          instructors: formData.instructors.filter((_, i) => i !== idx)
-                        });
-                      }}>-</Button>
-                    )}
-                    {idx === formData.instructors.length - 1 && (
-                      <Button type="button" size="icon" variant="ghost" onClick={() => {
-                        setFormData({
-                          ...formData,
-                          instructors: [...formData.instructors, ""]
-                        });
-                      }}>+</Button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-
             <div className="space-y-2">
-              <Label htmlFor="edit-description">Description</Label>
-              <Textarea
-                id="edit-description"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="Course description"
-                rows={3}
-              />
-            </div>
-
-            <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="edit-category">Category</Label>
-                <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((category) => (
-                      <SelectItem key={category} value={category}>{category}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-price">Price ($)</Label>
-                <Input
-                  id="edit-price"
-                  type="number"
-                  value={formData.price}
-                  onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                  placeholder="0"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-duration">Duration</Label>
-                <Input
-                  id="edit-duration"
-                  value={formData.duration}
-                  onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
-                  placeholder="e.g. 8 weeks"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="edit-status">Status</Label>
-              <Select value={formData.status} onValueChange={(value: Course['status']) => setFormData({ ...formData, status: value })}>
+              <Label htmlFor="status">Status</Label>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="All Statuses" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
                   <SelectItem value="draft">Draft</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="published">Published</SelectItem>
                   <SelectItem value="archived">Archived</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-
-            <div className="flex justify-end space-x-2 pt-4">
-              <Button variant="outline" onClick={() => {
-                setIsEditDialogOpen(false);
-                setEditingCourse(null);
-                resetForm();
-              }}>
-                Cancel
+            <div className="space-y-2">
+              <Label htmlFor="category">Category</Label>
+              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All Categories" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  {categories.map(category => (
+                    <SelectItem key={category} value={category}>{category}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>&nbsp;</Label>
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setSearchTerm('');
+                  setStatusFilter('all');
+                  setCategoryFilter('all');
+                }}
+                className="w-full"
+              >
+                Clear Filters
               </Button>
-              <Button onClick={handleEditCourse}>Update Course</Button>
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
+        </CardContent>
+      </Card>
 
-      {/* Edit Content Dialog */}
-      <Dialog open={isEditContentDialogOpen} onOpenChange={setIsEditContentDialogOpen}>
+      {/* Courses Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Courses ({filteredCourses.length})</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {filteredCourses.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <GraduationCap className="w-8 h-8 text-gray-400" />
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No courses found</h3>
+              <p className="text-gray-500 mb-4">
+                {courses.length === 0 
+                  ? "Get started by creating your first course" 
+                  : "Try adjusting your search or filters"
+                }
+              </p>
+              {courses.length === 0 && (
+                <Button onClick={openCreateDialog} className="bg-blue-600 hover:bg-blue-700">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create Your First Course
+                </Button>
+              )}
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Course</TableHead>
+                    <TableHead>Category</TableHead>
+                    <TableHead>Instructors</TableHead>
+                    <TableHead>Price</TableHead>
+                    <TableHead>Students</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredCourses.map((course) => (
+                    <TableRow key={course.id}>
+                      <TableCell>
+                        <div className="flex items-center space-x-3">
+                          <div className="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center">
+                            {course.thumbnail ? (
+                              <img src={course.thumbnail} alt={course.title} className="w-full h-full object-cover rounded-lg" />
+                            ) : (
+                              <Play className="w-6 h-6 text-gray-400" />
+                            )}
+                          </div>
+                          <div>
+                            <div className="font-medium text-gray-900">{course.title}</div>
+                            <div className="text-sm text-gray-500">{course.description.substring(0, 50)}...</div>
+                            <div className="flex items-center space-x-2 text-xs text-gray-400 mt-1">
+                              <Clock className="w-3 h-3" />
+                              <span>{course.duration}</span>
+                              <span>•</span>
+                              <span>{course.videos.length} videos</span>
+                            </div>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">{course.category}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          {course.instructors.map((instructor, index) => (
+                            <Badge key={index} variant="outline" className="text-xs">
+                              {instructor}
+                            </Badge>
+                          ))}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="font-medium">
+                          {(() => {
+                            if (course.price && typeof course.price === 'object' && 'amount' in (course.price as any)) {
+                              const priceObj = course.price as { amount: number; currency?: string };
+                              return `$${((priceObj.amount ?? 0) / 100).toFixed(2)} ${priceObj.currency ?? 'USD'}`;
+                            }
+                            return `$${course.price ?? 0}`;
+                          })()}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-2">
+                          <Users className="w-4 h-4 text-gray-400" />
+                          <span>{course.students}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={getStatusColor(course.status)}>
+                          {course.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-2">
+                          <Select 
+                            value={course.status} 
+                            onValueChange={(value: 'draft' | 'published' | 'archived') => handleStatusChange(course.id!, value)}
+                            disabled={!!operationLoading}
+                          >
+                            <SelectTrigger className="w-32">
+                              {operationLoading === `status-${course.id}` ? (
+                                <div className="flex items-center space-x-2">
+                                  <div className="w-3 h-3 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                                  <span className="text-xs">Updating...</span>
+                                </div>
+                              ) : (
+                                <SelectValue />
+                              )}
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="draft">Draft</SelectItem>
+                              <SelectItem value="published">Published</SelectItem>
+                              <SelectItem value="archived">Archived</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openEditDialog(course)}
+                            disabled={!!operationLoading}
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                disabled={!!operationLoading}
+                              >
+                                {operationLoading === `delete-${course.id}` ? (
+                                  <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                                ) : (
+                                  <Trash2 className="w-4 h-4" />
+                                )}
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Course</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete "{course.title}"? This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleDeleteCourse(course.id!)}>
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Course Dialog */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Edit Course Content</DialogTitle>
+            <DialogTitle>
+              {editingCourse ? 'Edit Course' : 'Create New Course'}
+            </DialogTitle>
             <DialogDescription>
-              Update course title, description, and video content
+              {editingCourse ? 'Update course information and content' : 'Add a new course to your platform'}
             </DialogDescription>
           </DialogHeader>
-          {selectedCourseForContent && (
-            <div className="space-y-6">
+          
+          <Tabs defaultValue="basic" className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="basic">Basic Info</TabsTrigger>
+              <TabsTrigger value="content">Content</TabsTrigger>
+              <TabsTrigger value="videos">Videos</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="basic" className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="title">Course Title *</Label>
+                  <Input
+                    id="title"
+                    value={formData.title}
+                    onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                    placeholder="Enter course title"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="category">Category *</Label>
+                  <Select value={formData.category} onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories.map(category => (
+                        <SelectItem key={category} value={category}>{category}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
               <div className="space-y-2">
-                <Label htmlFor="content-title">Course Title</Label>
+                <Label htmlFor="description">Description *</Label>
+                <Textarea
+                  id="description"
+                  value={formData.description}
+                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="Enter course description"
+                  rows={4}
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="price">Price ($) *</Label>
+                  <Input
+                    id="price"
+                    type="number"
+                    value={formData.price}
+                    onChange={(e) => setFormData(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
+                    placeholder="0.00"
+                    min="0"
+                    step="0.01"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="duration">Duration</Label>
+                  <Input
+                    id="duration"
+                    value={formData.duration}
+                    onChange={(e) => setFormData(prev => ({ ...prev, duration: e.target.value }))}
+                    placeholder="e.g., 12h 30m"
+                  />
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="thumbnail">Thumbnail URL</Label>
                 <Input
-                  id="content-title"
-                  value={contentFormData.title}
-                  onChange={(e) => setContentFormData({ ...contentFormData, title: e.target.value })}
+                  id="thumbnail"
+                  value={formData.thumbnail}
+                  onChange={(e) => setFormData(prev => ({ ...prev, thumbnail: e.target.value }))}
+                  placeholder="https://example.com/image.jpg"
                 />
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="content-description">Description</Label>
-                <Textarea
-                  id="content-description"
-                  value={contentFormData.description}
-                  onChange={(e) => setContentFormData({ ...contentFormData, description: e.target.value })}
-                  rows={3}
-                />
+                <Label htmlFor="status">Status</Label>
+                <Select value={formData.status} onValueChange={(value: 'draft' | 'published' | 'archived') => setFormData(prev => ({ ...prev, status: value }))}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="draft">Draft</SelectItem>
+                    <SelectItem value="published">Published</SelectItem>
+                    <SelectItem value="archived">Archived</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <Label className="text-base font-medium">Course Videos</Label>
-                  <Button type="button" size="sm" onClick={(e) => addContentVideo(e)}>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Video
+            </TabsContent>
+            
+            <TabsContent value="content" className="space-y-4">
+              <div className="space-y-2">
+                <Label>Instructors *</Label>
+                <div className="flex space-x-2">
+                  <Input
+                    value={instructorInput}
+                    onChange={(e) => setInstructorInput(e.target.value)}
+                    placeholder="Enter instructor name"
+                    onKeyPress={(e) => e.key === 'Enter' && addInstructor()}
+                  />
+                  <Button type="button" onClick={addInstructor} variant="outline">
+                    <Plus className="w-4 h-4" />
                   </Button>
                 </div>
-                
-                {contentFormData.videos.length === 0 ? (
-                  <div className="text-center py-8 border border-dashed border-border rounded-lg">
-                    <Video className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
-                    <p className="text-sm text-muted-foreground">No videos added yet</p>
-                    <Button type="button" variant="outline" size="sm" className="mt-2" onClick={(e) => addContentVideo(e)}>
-                      Add First Video
-                    </Button>
-                  </div>
-                ) : (
-                  contentFormData.videos.map((video, index) => (
-                    <div key={video.id} className="p-4 border border-border rounded-lg space-y-3">
-                      <div className="flex items-center justify-between">
-                        <h4 className="font-medium">Video {index + 1}</h4>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => removeContentVideo(video.id, e)}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {formData.instructors.map((instructor, index) => (
+                    <Badge key={index} variant="secondary" className="flex items-center space-x-1">
+                      <span>{instructor}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeInstructor(index)}
+                        className="ml-1 hover:text-red-600"
+                      >
+                        ×
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="videos" className="space-y-4">
+              <div className="space-y-2">
+                <Label>Add Video</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <Input
+                    value={videoInput.title}
+                    onChange={(e) => setVideoInput(prev => ({ ...prev, title: e.target.value }))}
+                    placeholder="Video title"
+                  />
+                  <Input
+                    value={videoInput.url}
+                    onChange={(e) => setVideoInput(prev => ({ ...prev, url: e.target.value }))}
+                    placeholder="Video URL"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Textarea
+                    value={videoInput.description}
+                    onChange={(e) => setVideoInput(prev => ({ ...prev, description: e.target.value }))}
+                    placeholder="Video description"
+                    rows={2}
+                  />
+                  <Input
+                    value={videoInput.duration}
+                    onChange={(e) => setVideoInput(prev => ({ ...prev, duration: e.target.value }))}
+                    placeholder="Duration (e.g., 25:30)"
+                  />
+                </div>
+                <Button type="button" onClick={addVideo} variant="outline" className="w-full">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Video
+                </Button>
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Course Videos ({formData.videos.length})</Label>
+                <div className="space-y-2">
+                  {formData.videos.map((video, index) => (
+                    <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="flex-1">
+                        <div className="font-medium">{video.title}</div>
+                        <div className="text-sm text-gray-500">{video.description}</div>
+                        <div className="text-xs text-gray-400">{video.duration}</div>
                       </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-2">
-                          <Label>Video Title</Label>
-                          <Input
-                            value={video.title}
-                            onChange={(e) => updateContentVideo(video.id, 'title', e.target.value)}
-                            placeholder="Video title"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Duration</Label>
-                          <Input
-                            value={video.duration}
-                            onChange={(e) => updateContentVideo(video.id, 'duration', e.target.value)}
-                            placeholder="e.g. 25:30"
-                          />
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Video Description</Label>
-                        <Textarea
-                          value={video.description}
-                          onChange={(e) => updateContentVideo(video.id, 'description', e.target.value)}
-                          placeholder="Video description"
-                          rows={2}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Video URL</Label>
-                        <Input
-                          value={video.url}
-                          onChange={(e) => updateContentVideo(video.id, 'url', e.target.value)}
-                          placeholder="https://example.com/video"
-                        />
-                      </div>
+                      <Button
+                        type="button"
+                        onClick={() => removeVideo(index)}
+                        variant="outline"
+                        size="sm"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
                     </div>
-                  ))
-                )}
+                  ))}
+                </div>
               </div>
-
-              <div className="flex justify-end space-x-2 pt-4">
-                <Button variant="outline" onClick={() => {
-                  setIsEditContentDialogOpen(false);
-                  setSelectedCourseForContent(null);
-                }}>
-                  Cancel
-                </Button>
-                <Button onClick={handleEditContent}>
-                  <Save className="w-4 h-4 mr-2" />
-                  Save Changes
-                </Button>
-              </div>
-            </div>
-          )}
+            </TabsContent>
+          </Tabs>
+          
+          <div className="flex justify-end space-x-2 pt-4">
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={editingCourse ? handleUpdateCourse : handleCreateCourse}
+              disabled={!formData.title || !formData.description || !formData.instructors.length || !formData.category || formData.price === undefined || !!operationLoading}
+            >
+              {operationLoading === 'create' ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                  Creating...
+                </>
+              ) : operationLoading === 'update' ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                  Updating...
+                </>
+              ) : (
+                editingCourse ? 'Update Course' : 'Create Course'
+              )}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
-      <Footer />
     </div>
   );
 }

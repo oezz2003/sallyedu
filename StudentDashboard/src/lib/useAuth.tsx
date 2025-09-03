@@ -6,20 +6,12 @@ import React, {
   useState,
   ReactNode,
 } from "react";
-
-// Define default user interface
-interface DefaultUser {
-  uid: string;
-  email: string;
-  displayName: string;
-  firstName: string;
-  lastName: string;
-  isDefaultUser: boolean;
-}
+import { auth } from './firebase';
+import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 
 // 1) Define the shape of our context
 interface AuthContextType {
-  user: DefaultUser | null;
+  user: User | null;
   loading: boolean;
   logout: () => Promise<void>;
 }
@@ -33,40 +25,25 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<DefaultUser | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    // Check if user is logged in from localStorage
-    const isLoggedIn = localStorage.getItem("isLoggedIn");
-    const defaultUserData = localStorage.getItem("defaultUser");
-    
-    if (isLoggedIn === "true" && defaultUserData) {
-      try {
-        const userData = JSON.parse(defaultUserData);
-        setUser(userData);
-      } catch (error) {
-        console.error("Failed to parse user data:", error);
-        setUser(null);
-      }
-    } else {
-      setUser(null);
-    }
-    
-    setLoading(false);
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setUser(user);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
-  // logout implementation that clears localStorage
+  // logout implementation
   const logout = async () => {
     try {
       setLoading(true);
-      
-      // Clear localStorage
-      localStorage.removeItem("defaultUser");
-      localStorage.removeItem("isLoggedIn");
-      
-      // Set local state
-      setUser(null);
+      await signOut(auth);
+    } catch (error) {
+      console.error('Logout error:', error);
     } finally {
       setLoading(false);
     }
@@ -79,7 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
-// 4) Custom hook to consume the context (named export)
+// Custom hook to consume the context (named export)
 export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) {

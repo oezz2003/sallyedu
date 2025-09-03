@@ -1,25 +1,38 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { users } from '../lib/users';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
 
 const Login: React.FC = () => {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const user = users.find(
-      (u) => u.username === username && u.password === password
-    );
-    if (user) {
+    setLoading(true);
+    setError('');
+    
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
       localStorage.setItem('isAuthenticated', 'true');
-      localStorage.setItem('user', JSON.stringify(user));
       navigate('/');
-    } else {
-      setError('Invalid username or password');
+    } catch (error: any) {
+      console.error('Login error:', error);
+      if (error.code === 'auth/invalid-credential') {
+        setError('Invalid email or password');
+      } else if (error.code === 'auth/user-not-found') {
+        setError('No account found with this email');
+      } else if (error.code === 'auth/wrong-password') {
+        setError('Invalid password');
+      } else {
+        setError('Login failed. Please try again.');
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -37,24 +50,25 @@ const Login: React.FC = () => {
             className="w-32 h-32 object-contain"
           />
         </div>
-        <h2 className="text-2xl font-bold mb-6 text-center">Login</h2>
-        {error && <div className="mb-4 text-red-500">{error}</div>}
+        <h2 className="text-2xl font-bold mb-6 text-center">Admin Login</h2>
+        {error && <div className="mb-4 text-red-500 text-sm">{error}</div>}
         <div className="mb-4">
-          <label className="block mb-1">Username</label>
+          <label className="block mb-1 text-sm font-medium">Email</label>
           <input
-            type="text"
-            className="w-full border px-3 py-2 rounded"
-            value={username}
-            onChange={e => setUsername(e.target.value)}
+            type="email"
+            className="w-full border px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            placeholder="admin@sallyedu.com"
             required
           />
         </div>
         <div className="mb-6">
-          <label className="block mb-1">Password</label>
+          <label className="block mb-1 text-sm font-medium">Password</label>
           <div className="relative">
             <input
               type={showPassword ? "text" : "password"}
-              className="w-full border px-3 py-2 pr-10 rounded"
+              className="w-full border px-3 py-2 pr-10 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
               value={password}
               onChange={e => setPassword(e.target.value)}
               required
@@ -106,7 +120,27 @@ const Login: React.FC = () => {
             </button>
           </div>
         </div>
-        <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700">Login</button>
+        <button 
+          type="submit" 
+          disabled={loading}
+          className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+        >
+          {loading ? (
+            <>
+              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Signing In...
+            </>
+          ) : (
+            'Login'
+          )}
+        </button>
+        
+        <div className="mt-4 text-center text-sm text-gray-600">
+          <p>Use your Firebase admin credentials to access the dashboard</p>
+        </div>
       </form>
     </div>
   );

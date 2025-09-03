@@ -1,0 +1,217 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions for role and permission checking
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+             getUserData().role in ['admin', 'editor'];
+    }
+    
+    function isAdult() {
+      return isAuthenticated() && 
+             getUserData().accountType == 'adult';
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && 
+             request.auth.uid == userId;
+    }
+    
+    function hasValidAge() {
+      return isAuthenticated() && 
+             getUserData().age >= 18;
+    }
+    
+    function canAccessAdmin() {
+      return isAuthenticated() && 
+             (isAdmin() || (isAdult() && hasValidAge()));
+    }
+    
+    // USERS Collection - Core user profiles and authentication data
+    match /users/{userId} {
+      // Users can read and write their own document
+      allow read, write: if isOwner(userId);
+      
+      // Admins can read all user documents (for admin dashboard)
+      allow read: if canAccessAdmin();
+      
+      // Admins can update user profiles (role changes, account management)
+      allow update: if isAdmin() && 
+                    (request.auth.uid != userId || // Can't change own role
+                     !('role' in request.resource.data) || // Or not changing role field
+                     request.resource.data.role == resource.data.role); // Or keeping same role
+      
+      // Admins can create new users (user management functionality)
+      allow create: if isAdmin() && 
+                    request.resource.data.keys().hasAll(['firstName', 'lastName', 'email', 'role', 'accountType']) &&
+                    request.resource.data.role in ['user', 'admin', 'editor'] &&
+                    request.resource.data.accountType in ['student', 'adult'];
+      
+      // Admins can deactivate users (soft delete)
+      allow update: if isAdmin() && 
+                    request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isActive', 'updatedAt']);
+    }
+    
+    // COURSES Collection - Course content and management
+    match /courses/{courseId} {
+      // Anyone can read published courses (for course browsing)
+      allow read: if resource.data.status == 'published' || canAccessAdmin();
+      
+      // Admins can create, update, and manage all courses
+      allow create, update: if isAdmin();
+      
+      // Admins can delete courses (with proper validation)
+      allow delete: if isAdmin();
+      
+      // Students can read courses they're enrolled in
+      allow read: if isAuthenticated() && 
+                  request.auth.uid in resource.data.get('enrolledStudents', []);
+    }
+    
+    // ENROLLMENTS Collection - Student course enrollments
+    match /enrollments/{enrollmentId} {
+      // Students can read their own enrollments
+      allow read: if isAuthenticated() && 
+                  resource.data.userId == request.auth.uid;
+      
+      // Admins can read all enrollments (for management dashboard)
+      allow read: if canAccessAdmin();
+      
+      // Students can create their own enrollments (course enrollment)
+      allow create: if isAuthenticated() && 
+                    request.resource.data.userId == request.auth.uid &&
+                    request.resource.data.keys().hasAll(['userId', 'courseId', 'enrollmentDate', 'status']) &&
+                    request.resource.data.status in ['active', 'pending'];
+      
+      // Students can update their own enrollment progress
+      allow update: if isAuthenticated() && 
+                    resource.data.userId == request.auth.uid &&
+                    request.resource.data.diff(resource.data).affectedKeys().hasOnly(['progress', 'completedLessons', 'lastAccessedAt']);
+      
+      // Admins can create, update, and manage all enrollments
+      allow create, update: if isAdmin();
+      
+      // Admins can cancel enrollments
+      allow update: if isAdmin() && 
+                    request.resource.data.status == 'cancelled';
+    }
+    
+    // PAYMENTS Collection - Payment processing and management
+    match /payments/{paymentId} {
+      // Students can read their own payment records
+      allow read: if isAuthenticated() && 
+                  resource.data.userId == request.auth.uid;
+      
+      // Admins can read all payment records (for financial management)
+      allow read: if canAccessAdmin();
+      
+      // Students can create payment records (during checkout)
+      allow create: if isAuthenticated() && 
+                    request.resource.data.userId == request.auth.uid &&
+                    request.resource.data.keys().hasAll(['userId', 'courseId', 'amount', 'currency', 'paymentMethod', 'status']) &&
+                    request.resource.data.status in ['pending', 'processing'];
+      
+      // Payment processing service can update payment status
+      allow update: if isAuthenticated() && 
+                    resource.data.userId == request.auth.uid &&
+                    request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'transactionId', 'paymentDate']);
+      
+      // Admins can update payment status and process refunds
+      allow update: if isAdmin() &&
+                    (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']) ||
+                     (request.resource.data.status == 'refunded' && 
+                      request.resource.data.keys().hasAll(['refundAmount', 'refundDate', 'refundReason'])));
+    }
+    
+    // CERTIFICATES Collection - Course completion certificates
+    match /certificates/{certificateId} {
+      // Students can read their own certificates
+      allow read: if isAuthenticated() && 
+                  resource.data.userId == request.auth.uid;
+      
+      // Admins can read and manage all certificates
+      allow read, create, update: if canAccessAdmin();
+      
+      // Students can create certificates upon course completion
+      allow create: if isAuthenticated() && 
+                    request.resource.data.userId == request.auth.uid &&
+                    request.resource.data.keys().hasAll(['userId', 'courseId', 'completionDate', 'certificateType']);
+    }
+    
+    // ANALYTICS Collection - Dashboard analytics and reporting data
+    match /analytics/{document=**} {
+      // Only admins can read analytics data
+      allow read: if canAccessAdmin();
+      
+      // Only system can write analytics data (server-side functions)
+      allow write: if false; // Disable client-side writes, use Cloud Functions
+    }
+    
+    // SETTINGS Collection - Application configuration and settings
+    match /settings/{settingId} {
+      // Anyone can read public settings
+      allow read: if true;
+      
+      // Only admins can modify settings
+      allow write: if isAdmin();
+    }
+    
+    // NOTIFICATIONS Collection - User notifications and messages
+    match /notifications/{notificationId} {
+      // Users can read their own notifications
+      allow read: if isAuthenticated() && 
+                  resource.data.userId == request.auth.uid;
+      
+      // Admins can read all notifications
+      allow read: if canAccessAdmin();
+      
+      // System can create notifications (server-side)
+      allow create: if isAdmin() || 
+                    (isAuthenticated() && request.resource.data.userId == request.auth.uid);
+      
+      // Users can mark their own notifications as read
+      allow update: if isAuthenticated() && 
+                    resource.data.userId == request.auth.uid &&
+                    request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read', 'readAt']);
+    }
+    
+    // SUPPORT Collection - Customer support tickets and messages
+    match /support/{ticketId} {
+      // Users can read and create their own support tickets
+      allow read, create: if isAuthenticated() && 
+                          (request.resource.data.userId == request.auth.uid || 
+                           resource.data.userId == request.auth.uid);
+      
+      // Users can update their own tickets (add messages)
+      allow update: if isAuthenticated() && 
+                    resource.data.userId == request.auth.uid;
+      
+      // Admins can read and manage all support tickets
+      allow read, update: if canAccessAdmin();
+    }
+    
+    // LOGS Collection - System and audit logs (admin only)
+    match /logs/{document=**} {
+      // Only admins can read logs
+      allow read: if isAdmin();
+      
+      // Only system can write logs (server-side functions)
+      allow write: if false; // Use Cloud Functions for logging
+    }
+    
+    // Default deny rule for any unmatched paths
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
